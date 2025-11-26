@@ -1,5 +1,7 @@
 import { MessageTypes } from "@/lib/constants";
 import { ContentRouter } from "@/lib/router/index";
+import { PageInfo } from "@/lib/types";
+import { generateUniqueId } from "@/lib/utils";
 
 export default defineContentScript({
   matches: ["<all_urls>"],
@@ -11,14 +13,18 @@ export default defineContentScript({
     });
 
     // Register handler with proper typing
-    contentRouter.registerHandler(MessageTypes.FROM_BROWSER, (payload: unknown) => {
-      console.log("Content script handler processing payload:", payload);
+    contentRouter.registerHandler<unknown, PageInfo>(MessageTypes.INITIALIZE_CHAT, (payload) => {
+      const browserContent = document.body.innerText;
+      const url = window.location.href;
+      const title = document.title;
+
+      const id = generateUniqueId(url);
       return {
-        success: true,
-        message: "Content script processed the request",
-        payload,
-        timestamp: Date.now(),
-      };
+        id: id,
+        content: browserContent,
+        url: url,
+        title: title
+      }
     });
 
     // Start listening for messages

@@ -1,3 +1,4 @@
+import { MessageTypes } from '@/lib/constants';
 import './styles.css';
 import { Button } from './ui/button';
 
@@ -12,26 +13,15 @@ const Layout = () => {
       }
 
       const response = await browser.tabs.sendMessage(currentTab.id, {
-        type: "FROM_BROWSER",
-        payload: "content from popup"
+        type: MessageTypes.INITIALIZE_CHAT,
       });
-
-      console.log("Response from content script:", response);
-      
+            
       // Handle the new response format
       if (response?.success) {
         console.log("Success:", response.data);
       } else if (response?.error) {
         console.error("Error from content script:", response.error.message);
       }
-
-      const response2 = await browser.runtime.sendMessage({
-        type: "FROM_BROWSER2",
-        payload: "background from popup"
-      });
-
-      console.log("Response from background script:", response2);
-
     } catch (e) {
       console.error("Error sending message to content script:", e);
     }

@@ -30,7 +30,7 @@ export class ContentRouter extends BaseRouter {
       // Send back to background script
       try {
         const backgroundResponse = await browser.runtime.sendMessage({
-          type: "FROM_CONTENT",
+          type: type,
           payload: result,
         });
 
