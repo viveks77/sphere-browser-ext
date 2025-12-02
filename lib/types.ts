@@ -5,6 +5,8 @@ export type MessageHandler<T, R> = (
   payload: T
 ) => R | Promise<R>;
 
+export type StorageType = 'local' | 'session';
+
 // Message structure with proper typing
 export interface Message<T = unknown> {
   type: MessageType;

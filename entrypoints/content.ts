@@ -17,6 +17,10 @@ export default defineContentScript({
       const browserContent = document.body.innerText;
       const url = window.location.href;
       const title = document.title;
+      
+      if(url == null) {
+        throw new Error('No Url Found');
+      }
 
       const id = generateUniqueId(url);
       return {

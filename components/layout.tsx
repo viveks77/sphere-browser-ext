@@ -22,6 +22,7 @@ const Layout = () => {
       } else if (response?.error) {
         console.error("Error from content script:", response.error.message);
       }
+    
     } catch (e) {
       console.error("Error sending message to content script:", e);
     }
