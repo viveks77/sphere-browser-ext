@@ -1,34 +1,31 @@
 import { Document } from '@langchain/core/documents';
 import { Embeddings } from '@langchain/core/embeddings';
-import { MemoryVectorStore } from "@langchain/classic/vectorstores/memory";
+import { MemoryVectorStore } from '@langchain/classic/vectorstores/memory';
 import StorageService from '@/services/storage';
 import {
   SearchResult,
   VectorStoreConfig,
 } from '@/lib/models';
 
-interface StoredVector {
-  id: string;
-  vector: number[];
-  document: {
+interface TabDocuments {
+  tabId: string;
+  documents: Array<{
     pageContent: string;
     metadata?: Record<string, unknown>;
-  };
+  }>;
+  updatedAt: number;
 }
 
 /**
- * In-memory vector store using LangChain embeddings
- * Stores vectors in memory and persists documents to browser storage
+ * Tab-based vector store using LangChain MemoryVectorStore
+ * Maintains separate document stores for each tab session
  */
 export class VectorStoreService {
-  private vectors: Map<string, { embedding: number[]; document: Document }> = new Map();
+  // In-memory vector stores per tab
+  private tabVectorStores: Map<string, MemoryVectorStore> = new Map();
   private storageService: StorageService;
-  private storageKey: string;
   private debug: boolean;
   private embeddings: Embeddings;
-  private idCounter: number = 0;
-  private vectorStore: MemoryVectorStore | null = null;
-  
 
   constructor(
     embeddings: Embeddings,
@@ -37,105 +34,115 @@ export class VectorStoreService {
   ) {
     this.embeddings = embeddings;
     this.storageService = storageService;
-    this.storageKey = config.storageKey || 'vector_store';
     this.debug = config.debug ?? false;
   }
 
   /**
-   * Initialize vector store and load from storage
+   * Get or create vector store for a tab
    */
-  async initialize(): Promise<void> {
-    try {
-      this.log('Initializing vector store');
-      await this.load();
-      this.log('Vector store initialized');
-    } catch (error) {
-      this.logError('Failed to initialize vector store', error);
-      throw error;
+  private async getOrCreateTabVectorStore(tabId: string): Promise<MemoryVectorStore> {
+    // Check if already in memory
+    if (this.tabVectorStores.has(tabId)) {
+      return this.tabVectorStores.get(tabId)!;
     }
+
+    // Create new MemoryVectorStore
+    const vectorStore = new MemoryVectorStore(this.embeddings);
+
+    // Load documents for this tab from storage
+    const storageKey = `tab_documents_${tabId}`;
+    const tabDocs = await this.storageService.getItem<TabDocuments>(
+      storageKey,
+      'session'
+    );
+
+    if (tabDocs && tabDocs.documents && tabDocs.documents.length > 0) {
+      try {
+        const documents = tabDocs.documents.map(
+          (doc) =>
+            new Document({
+              pageContent: doc.pageContent,
+              metadata: doc.metadata || {},
+            })
+        );
+
+        // Add documents to the vector store
+        await vectorStore.addDocuments(documents);
+        this.log('Loaded tab documents from storage', { tabId, count: documents.length });
+      } catch (error) {
+        this.logError('Failed to load tab documents', error);
+      }
+    }
+
+    this.tabVectorStores.set(tabId, vectorStore);
+    return vectorStore;
   }
 
   /**
-   * Add documents to the vector store
+   * Add webpage document to a tab's vector store
    */
-  async addDocuments(
-    texts: string[],
-    metadata?: Record<string, unknown>[]
+  async addWebpageToTab(
+    tabId: string,
+    pageContent: string,
+    metadata?: Record<string, unknown>
   ): Promise<void> {
     try {
-      this.log('Adding documents to vector store', { count: texts.length });
+      const vectorStore = await this.getOrCreateTabVectorStore(tabId);
 
-      // Embed texts using LangChain embeddings
-      const embeddings = await this.embeddings.embedDocuments(texts);
-
-      // Store vectors with documents
-      texts.forEach((text, index) => {
-        const id = `doc_${this.idCounter++}`;
-        const document = new Document({
-          pageContent: text,
-          metadata: {
-            ...metadata?.[index],
-            id,
-          },
-        });
-
-        this.vectors.set(id, {
-          embedding: embeddings[index],
-          document,
-        });
+      // Create document with metadata
+      const document = new Document({
+        pageContent,
+        metadata: {
+          ...metadata,
+          tabId,
+          addedAt: Date.now(),
+        },
       });
 
-      await this.persist();
-      this.log('Successfully added documents', { count: texts.length });
+      // Add to LangChain MemoryVectorStore
+      await vectorStore.addDocuments([document]);
+
+      // Persist to storage
+      await this.persistTabDocuments(tabId, document);
+
+      this.log('Successfully added webpage to tab', { tabId });
     } catch (error) {
-      this.logError('Failed to add documents', error);
+      this.logError('Failed to add webpage to tab', error);
       throw error;
     }
   }
 
   /**
-   * Search for similar documents
+   * Search documents in a tab's vector store
    */
-  async search(
+  async searchInTab(
+    tabId: string,
     query: string,
-    limit: number = 10,
-    threshold?: number
+    limit: number = 5
   ): Promise<SearchResult[]> {
     try {
-      this.log('Searching vector store', {
+      this.log('Searching tab documents', {
+        tabId,
         query: query.substring(0, 50),
         limit,
       });
 
-      // Get query embedding
-      const [queryEmbedding] = await this.embeddings.embedDocuments([query]);
+      const vectorStore = await this.getOrCreateTabVectorStore(tabId);
 
-      // Calculate similarity scores for all stored documents
-      const scores: Array<{
-        id: string;
-        score: number;
-        document: Document;
-      }> = [];
+      // Use LangChain's similaritySearchWithScore
+      const results = await vectorStore.similaritySearchWithScore(query, limit);
 
-      for (const [id, { embedding, document }] of this.vectors) {
-        const similarity = this.cosineSimilarity(queryEmbedding, embedding);
-        scores.push({ id, score: similarity, document });
-      }
-
-      // Sort by similarity and filter by threshold
-      const results = scores
-        .sort((a, b) => b.score - a.score)
-        .slice(0, limit)
-        .filter((item) => !threshold || item.score >= threshold)
-        .map((item) => ({
-          id: item.id,
-          text: item.document.pageContent,
-          score: item.score,
-          metadata: item.document.metadata,
+      // Convert results to SearchResult format
+      const searchResults: SearchResult[] = results
+        .map(([doc, score]) => ({
+          id: `${tabId}_${Date.now()}`,
+          text: doc.pageContent,
+          score: 1 - score, // Convert distance to similarity
+          metadata: doc.metadata,
         }));
 
-      this.log('Search completed', { resultCount: results.length });
-      return results;
+      this.log('Search completed', { tabId, resultCount: searchResults.length });
+      return searchResults;
     } catch (error) {
       this.logError('Search failed', error);
       throw error;
@@ -143,111 +150,71 @@ export class VectorStoreService {
   }
 
   /**
-   * Get vector store size (number of documents)
+   * Get document count for a tab
    */
-  async getSize(): Promise<number> {
-    return this.vectors.size;
+  async getTabDocumentCount(tabId: string): Promise<number> {
+    try {
+      const vectorStore = await this.getOrCreateTabVectorStore(tabId);
+      // Access internal memory vectors (MemoryVectorStore stores them internally)
+      const internalStore = vectorStore as any;
+      return internalStore?.memoryVectors?.length ?? 0;
+    } catch {
+      return 0;
+    }
+  }
+
+  async getTabDocument(tabId: string): Promise<TabDocuments | null> {
+    try{
+      const storageKey = `tab_documents_${tabId}`;
+      const tabDocument = await this.storageService.getItem<TabDocuments>(storageKey, 'session');
+      if(!tabDocument || tabDocument.documents.length == 0 ){
+        return null;
+      }
+      return tabDocument;
+    }catch(error){
+      return null;
+    }
   }
 
   /**
-   * Clear all documents
+   * Clear all documents for a tab
    */
-  async clear(): Promise<void> {
+  async clearTabDocuments(tabId: string): Promise<void> {
     try {
-      this.log('Clearing vector store');
-      this.vectors.clear();
-      this.idCounter = 0;
-      await this.storageService.setItem(this.storageKey, [], 'local');
-      this.log('Vector store cleared');
+      this.log('Clearing tab documents', { tabId });
+
+      // Remove from memory
+      this.tabVectorStores.delete(tabId);
+
+      // Remove from storage
+      const storageKey = `tab_documents_${tabId}`;
+      await this.storageService.setItem(storageKey, null, 'session');
+
+      this.log('Tab documents cleared', { tabId });
     } catch (error) {
-      this.logError('Failed to clear vector store', error);
+      this.logError('Failed to clear tab documents', error);
       throw error;
     }
   }
 
   /**
-   * Cosine similarity between two vectors
+   * Persist tab's documents to storage
    */
-  private cosineSimilarity(vecA: number[], vecB: number[]): number {
-    if (vecA.length !== vecB.length) {
-      throw new Error('Vectors must have the same length');
-    }
-
-    let dotProduct = 0;
-    let normA = 0;
-    let normB = 0;
-
-    for (let i = 0; i < vecA.length; i++) {
-      dotProduct += vecA[i] * vecB[i];
-      normA += vecA[i] * vecA[i];
-      normB += vecB[i] * vecB[i];
-    }
-
-    const denominator = Math.sqrt(normA) * Math.sqrt(normB);
-    if (denominator === 0) return 0;
-
-    return dotProduct / denominator;
-  }
-
-  /**
-   * Load documents from storage
-   */
-  private async load(): Promise<void> {
+  private async persistTabDocuments(
+    tabId: string,
+    document: Document
+  ): Promise<void> {
     try {
-      this.log('Loading documents from storage');
-      this.vectorStore = new MemoryVectorStore(this.embeddings);
-      
-      if(!this.vectorStore){
-        throw new Error("Failed to initalize Vector Store");
-      }
-      const stored = await this.storageService.getItem<StoredVector[]>(this.storageKey, 'session');
-      if (stored && Array.isArray(stored)) {
-        stored.forEach((item) => {
-          const document = new Document({
-            pageContent: item.document.pageContent,
-            metadata: item.document.metadata,
-          });
-
-          this.vectors.set(item.id, {
-            embedding: item.vector,
-            document,
-          });
-          // Update counter
-          const match = item.id.match(/doc_(\d+)/);
-          if (match) {
-            const num = parseInt(match[1], 10);
-            if (num >= this.idCounter) {
-              this.idCounter = num + 1;
-            }
-          }
-        });
-
-        this.log('Loaded documents from storage', { count: stored.length });
-      }
+      // Get documents from MemoryVectorStore
+      const tabDocs: TabDocuments = {
+        tabId,
+        documents: [document],
+        updatedAt: Date.now(),
+      };
+      const storageKey = `tab_documents_${tabId}`;
+      await this.storageService.setItem(storageKey, tabDocs, 'session');
     } catch (error) {
-      this.logError('Failed to load from storage', error);
-    }
-  }
-
-  /**
-   * Persist documents to storage
-   */
-  private async persist(): Promise<void> {
-    try {
-      const data: StoredVector[] = Array.from(this.vectors).map(
-        ([id, { embedding, document }]) => ({
-          id,
-          vector: embedding,
-          document: {
-            pageContent: document.pageContent,
-            metadata: document.metadata,
-          },
-        })
-      );
-
-      await this.storageService.setItem(this.storageKey, data, 'local');
-    } catch (error) {
-      this.logError('Failed to persist to storage', error);
+      this.logError('Failed to persist tab documents', error);
     }
   }
 

@@ -17,6 +17,7 @@ import {
   AIMessage,
   BaseMessage,
 } from '@langchain/core/messages';
+import { RunnableSequence } from '@langchain/core/runnables';
 
 export class GeminiLLMService extends BaseLLMService {
   private client: ChatGoogleGenerativeAI | null = null;
@@ -64,12 +65,20 @@ export class GeminiLLMService extends BaseLLMService {
     try {
       this.log('Sending chat request to Gemini', {
         messageCount: request.messages.length,
+        hasRagContext: !!request.ragContext,
       });
 
       const messages: BaseMessage[] = this.convertMessages(request.messages);
 
-      if (request.systemPrompt) {
-        messages.unshift(new SystemMessage(request.systemPrompt));
+      // Build system prompt with RAG context if provided
+      let systemPrompt = request.systemPrompt || '';
+      if (request.ragContext && request.ragContext.documents.length > 0) {
+        const context = this.buildRagContext(request.ragContext.documents);
+        systemPrompt = this.enhanceSystemPromptWithContext(systemPrompt, context);
+      }
+
+      if (systemPrompt) {
+        messages.unshift(new SystemMessage(systemPrompt));
       }
 
       const response = await this.client.invoke(messages);
@@ -107,12 +116,23 @@ export class GeminiLLMService extends BaseLLMService {
     }
 
     try {
-      this.log('Starting stream chat with Gemini');
+      this.log('Starting stream chat with Gemini', {
+        hasRagContext: !!request.ragContext,
+      });
 
       const messages: BaseMessage[] = this.convertMessages(request.messages);
 
-      if (request.systemPrompt) {
-        messages.unshift(new SystemMessage(request.systemPrompt));
+      // Build system prompt with RAG context if provided
+      let systemPrompt = request.systemPrompt || '';
+      if (request.ragContext && request.ragContext.documents.length > 0) {
+        const context = this.buildRagContext(request.ragContext.documents);
+        systemPrompt = this.enhanceSystemPromptWithContext(systemPrompt, context);
+      }else if(request.generalContext){
+        systemPrompt = this.enhanceSystemPromptWithContext(systemPrompt, request.generalContext);
+      }
+
+      if (systemPrompt) {
+        messages.unshift(new SystemMessage(systemPrompt));
       }
 
       const stream = await this.client.stream(messages);
@@ -138,6 +158,35 @@ export class GeminiLLMService extends BaseLLMService {
    */
   isConfigured(): boolean {
     return !!this.config.apiKey;
+  }
+
+  /**
+   * Build context string from RAG search results
+   */
+  private buildRagContext(documents: Array<{ text: string; score: number }>): string {
+    return documents
+      .map(
+        (doc, index) =>
+          `[Document ${index + 1}]\n${doc.text}\n(Relevance: ${(doc.score * 100).toFixed(1)}%)`
+      )
+      .join('\n\n');
+  }
+
+  /**
+   * Enhance system prompt with RAG context
+   */
+  private enhanceSystemPromptWithContext(basePrompt: string, context: string): string {
+    if (!context) {
+      return basePrompt;
+    }
+
+    const contextSection = `You are a helpful assistant. Use the following context to answer questions:\n\n${context}\n\nIf the context doesn't contain the answer, use your general knowledge but mention that the information was not in the provided context.`;
+
+    if (!basePrompt) {
+      return contextSection;
+    }
+
+    return `${basePrompt}\n\n${contextSection}`;
   }
 
   /**

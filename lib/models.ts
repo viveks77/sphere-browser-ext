@@ -22,6 +22,11 @@ export interface ChatRequest {
   maxTokens?: number;
   systemPrompt?: string;
   metadata?: Record<string, unknown>;
+  ragContext?: {
+    documents: SearchResult[];
+    threshold?: number;
+  };
+  generalContext?: string;
 }
 
 /**

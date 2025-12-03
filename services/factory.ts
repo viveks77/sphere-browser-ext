@@ -64,7 +64,7 @@ export class AIServiceFactory {
   /**
    * Initialize all services
    */
-  async initialize(): Promise<void> {
+  initialize() {
     try {
       this.log('Initializing AI Service Factory');
 
@@ -87,7 +87,6 @@ export class AIServiceFactory {
         this.storageService,
         this.config.vectorStore
       );
-      await this.vectorStoreService.initialize();
 
       this.log('AI Service Factory initialized successfully');
     } catch (error) {
@@ -159,7 +158,7 @@ export class AIServiceFactory {
     const storageKey = `tab_session_${tabId}`;
     const storedSession = await this.storageService.getItem<ChatSession>(
       storageKey,
-      'local'
+      'session'
     );
 
     if (storedSession) {
@@ -178,7 +177,7 @@ export class AIServiceFactory {
     };
 
     this.tabSessions.set(tabId, newSession);
-    await this.storageService.setItem<ChatSession>(storageKey, newSession, 'local');
+    await this.storageService.setItem<ChatSession>(storageKey, newSession, 'session');
     this.log('Created new tab session', { tabId });
 
     return newSession;
@@ -197,7 +196,7 @@ export class AIServiceFactory {
     const storageKey = `tab_session_${tabId}`;
     const session = await this.storageService.getItem<ChatSession>(
       storageKey,
-      'local'
+      'session'
     );
 
     if (session) {
@@ -234,7 +233,7 @@ export class AIServiceFactory {
 
     // Persist to storage
     const storageKey = `tab_session_${tabId}`;
-    await this.storageService.setItem<ChatSession>(storageKey, session, 'local');
+    await this.storageService.setItem<ChatSession>(storageKey, session, 'session');
 
     this.log('Added message to tab session', {
       tabId,
@@ -254,25 +253,45 @@ export class AIServiceFactory {
   }
 
   /**
-   * Embed and store text in vector store
+   * Add webpage to a tab's vector store
    */
-  async embedAndStore(
-    text: string,
+  async addWebpageToTab(
+    tabId: string,
+    pageContent: string,
     metadata?: Record<string, unknown>
   ): Promise<void> {
-    await this.getVectorStoreService().addDocuments([text], [metadata || {}]);
-    this.log('Embedded and stored text');
+    await this.getVectorStoreService().addWebpageToTab(tabId, pageContent, metadata);
+    this.log('Added webpage to tab vector store', { tabId });
   }
 
   /**
-   * Search vector store with query text
+   * Search documents in a tab's vector store
    */
-  async semanticSearch(
+  async searchTabDocuments(
+    tabId: string,
     queryText: string,
-    limit?: number,
-    threshold?: number
+    limit?: number
   ): Promise<SearchResult[]> {
-    return this.getVectorStoreService().search(queryText, limit, threshold);
+    return this.getVectorStoreService().searchInTab(
+      tabId,
+      queryText,
+      limit || 5,
+    );
+  }
+
+  /**
+   * Get document count for a tab
+   */
+  async getTabDocumentCount(tabId: string): Promise<number> {
+    return this.getVectorStoreService().getTabDocumentCount(tabId);
+  }
+
+  /**
+   * Clear a tab's documents from vector store
+   */
+  async clearTabDocuments(tabId: string): Promise<void> {
+    await this.getVectorStoreService().clearTabDocuments(tabId);
+    this.log('Cleared tab documents from vector store', { tabId });
   }
 
   /**
@@ -306,6 +325,64 @@ export class AIServiceFactory {
   }
 
   /**
+   * RAG Chat - Retrieval Augmented Generation
+   * Searches vector store for context, includes conversation history
+   */
+  /**
+   * Prepare a chat request with RAG context
+   * Searches vector store and adds retrieved documents to the request
+   */
+  async prepareRagRequest(
+    tabId: string,
+    request: ChatRequest,
+    contextLimit: number = 5
+  ): Promise<ChatRequest> {
+    try {
+      // Get last user message for search query
+      const lastUserMessage = request.messages
+        .reverse()
+        .find((m) => m.role === 'user');
+
+      if (!lastUserMessage) {
+        return request;
+      }
+
+      // Search vector store for relevant documents
+      const searchResults = await this.searchTabDocuments(
+        tabId,
+        lastUserMessage.content,
+        contextLimit
+      );
+
+      if (searchResults.length === 0) {
+        const tabDocument = await this.getVectorStoreService().getTabDocument(tabId);
+        if(tabDocument && tabDocument.documents.length > 0 ){
+          const pageContent = tabDocument.documents.map(doc => doc.pageContent).join('\n');
+          return {
+            ...request,
+            generalContext: pageContent
+          }
+        }else{
+          return request;
+        }  
+      }
+
+      // Add RAG context to request
+      return {
+        ...request,
+        ragContext: {
+          documents: searchResults
+        },
+      };
+    } catch (error) {
+      this.logError('Failed to prepare RAG request', error);
+      // Return original request if RAG fails
+      return request;
+    }
+  }  /**
+   * Build context string from search results
+   */
+  /**
    * Log debug messages
    */
   private log(message: string, data?: unknown): void {
@@ -330,9 +407,9 @@ let factoryInstance: AIServiceFactory | null = null;
 /**
  * Get or create factory instance
  */
-export async function getAIServiceFactory(
+export function getAIServiceFactory(
   config?: AIServiceFactoryConfig
-): Promise<AIServiceFactory> {
+) {
   if (factoryInstance) {
     return factoryInstance;
   }
@@ -344,7 +421,7 @@ export async function getAIServiceFactory(
   }
 
   factoryInstance = new AIServiceFactory(config);
-  await factoryInstance.initialize();
+  factoryInstance.initialize();
 
   return factoryInstance;
 }

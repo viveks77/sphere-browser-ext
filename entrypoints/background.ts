@@ -6,7 +6,6 @@ import { devConfig } from "@/services/config";
 import StorageService from "@/services/storage";
 
 export default defineBackground(() => {
-  const storageService = new StorageService();
   const chatService = new ChatService();
   chatService.initialize(devConfig);
   // Initialize router with debug enabled for development
@@ -19,14 +18,20 @@ export default defineBackground(() => {
     console.log(`[Paylod Info for message Type - ${MessageTypes.INITIALIZE_CHAT}]`, payload)
 
     const {id} = payload;
-    const pageInfo = await storageService.getItem<PageInfo>(id, 'session');
-    if(!pageInfo){
-      console.log('no pageInfo found');
-    };
     
     // Load or create session for this tab
     const session = await chatService.setCurrentTab(id);
     console.log('Tab session loaded/created:', session);
+
+    const tabDocument = await chatService.getTabDocumentCount();
+    console.log('tabdocument length', tabDocument, payload?.content);
+    if(tabDocument  == 0){
+      await chatService.storeWebpageContent(payload?.content, {title: payload?.title, url: payload?.url});
+    }
+    // const response = await chatService.sendMessage("what is at the bottom of the page ?", undefined, true);
+    const response = await chatService.getFactory().searchTabDocuments(payload.id, "what is mcp ?");
+    console.log('LLM Response for summary', response);
+
   });  
   // Start listening for messages
   router.startListener().catch((error) => {

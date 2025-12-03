@@ -1,8 +1,3 @@
-/**
- * Chat Service
- * Tab-based chat management with auto-load/create sessions
- */
-
 import {
   getAIServiceFactory,
   AIServiceFactory,
@@ -13,6 +8,7 @@ import {
   ChatMessage,
   ChatRequest,
   ChatResponse,
+  SearchResult,
 } from '@/lib/models';
 
 export class ChatService {
@@ -22,8 +18,8 @@ export class ChatService {
   /**
    * Initialize the chat service
    */
-  async initialize(config: AIServiceFactoryConfig): Promise<void> {
-    this.factory = await getAIServiceFactory(config);
+  initialize(config: AIServiceFactoryConfig) {
+    this.factory = getAIServiceFactory(config);
   }
 
   /**
@@ -50,11 +46,15 @@ export class ChatService {
   }
 
   /**
-   * Send a message in the current tab's session
+   * Send a message with RAG context
+   * The LLM service handles RAG internally
    */
   async sendMessage(
     userMessage: string,
-    systemPrompt?: string
+    systemPrompt?: string,
+    enableRag: boolean = true,
+    ragContextLimit?: number,
+    ragThreshold?: number
   ): Promise<ChatResponse> {
     if (!this.factory || !this.currentTabId) {
       throw new Error('No active tab');
@@ -73,12 +73,21 @@ export class ChatService {
     await this.factory.addMessageToTabSession(this.currentTabId, userMsg);
 
     // Create chat request
-    const chatRequest: ChatRequest = {
+    let chatRequest: ChatRequest = {
       messages: session.messages,
       systemPrompt,
     };
 
-    // Get response from LLM
+    // Prepare RAG context if enabled
+    if (enableRag) {
+      chatRequest = await this.factory.prepareRagRequest(
+        this.currentTabId,
+        chatRequest,
+        ragContextLimit || 5
+      );
+    }
+
+    // Get response from LLM (which handles RAG if context is present)
     const response = await this.factory.chat(chatRequest);
 
     // Add assistant message to session
@@ -93,11 +102,15 @@ export class ChatService {
   }
 
   /**
-   * Stream a message response in the current tab's session
+   * Stream a message response with RAG context
+   * The LLM service handles RAG internally
    */
   async *streamMessage(
     userMessage: string,
-    systemPrompt?: string
+    systemPrompt?: string,
+    enableRag: boolean = true,
+    ragContextLimit?: number,
+    ragThreshold?: number
   ): AsyncGenerator<string, void, unknown> {
     if (!this.factory || !this.currentTabId) {
       throw new Error('No active tab');
@@ -116,12 +129,21 @@ export class ChatService {
     await this.factory.addMessageToTabSession(this.currentTabId, userMsg);
 
     // Create chat request
-    const chatRequest: ChatRequest = {
+    let chatRequest: ChatRequest = {
       messages: session.messages,
       systemPrompt,
     };
 
-    // Stream response from LLM
+    // Prepare RAG context if enabled
+    if (enableRag) {
+      chatRequest = await this.factory.prepareRagRequest(
+        this.currentTabId,
+        chatRequest,
+        ragContextLimit || 5
+      );
+    }
+
+    // Stream response from LLM (which handles RAG if context is present)
     let fullResponse = '';
     for await (const chunk of this.factory.streamChat(chatRequest)) {
       fullResponse += chunk.content;
@@ -156,6 +178,42 @@ export class ChatService {
     }
 
     return this.factory;
+  }
+
+  /**
+   * Store webpage content for current tab
+   */
+  async storeWebpageContent(
+    pageContent: string,
+    metadata?: Record<string, unknown>
+  ): Promise<void> {
+    if (!this.factory || !this.currentTabId) {
+      throw new Error('No active tab');
+    }
+
+    await this.factory.addWebpageToTab(this.currentTabId, pageContent, metadata);
+  }
+
+  /**
+   * Get document count for current tab
+   */
+  async getTabDocumentCount(): Promise<number> {
+    if (!this.factory || !this.currentTabId) {
+      throw new Error('No active tab');
+    }
+
+    return await this.factory.getTabDocumentCount(this.currentTabId);
+  }
+
+  /**
+   * Clear documents for current tab
+   */
+  async clearTabDocuments(): Promise<void> {
+    if (!this.factory || !this.currentTabId) {
+      throw new Error('No active tab');
+    }
+
+    await this.factory.clearTabDocuments(this.currentTabId);
   }
 }
 
