@@ -248,7 +248,7 @@ export class AIServiceFactory {
     this.tabSessions.delete(tabId);
     // Clear from storage by setting to null
     const storageKey = `tab_session_${tabId}`;
-    await this.storageService.setItem(storageKey, null, 'local');
+    await this.storageService.setItem(storageKey, null, 'session');
     this.log('Cleared tab session', { tabId });
   }
 
@@ -325,12 +325,21 @@ export class AIServiceFactory {
   }
 
   /**
-   * RAG Chat - Retrieval Augmented Generation
-   * Searches vector store for context, includes conversation history
-   */
-  /**
    * Prepare a chat request with RAG context
-   * Searches vector store and adds retrieved documents to the request
+   * 
+   * Strategy:
+   * 1. Search vector store for relevant chunks with relevance threshold (0.4 = 40% minimum)
+   * 2. If relevant chunks found → Use as ragContext for targeted retrieval
+   * 3. If no relevant chunks → Use full page as generalContext for comprehensive fallback
+   * 
+   * This approach optimizes context window usage:
+   * - Relevant chunks when query matches page content
+   * - Full page when semantic search returns nothing (edge cases/broad queries)
+   * 
+   * @param tabId - Tab identifier for session isolation
+   * @param request - Chat request with conversation history
+   * @param contextLimit - Maximum number of chunks to retrieve (default: 5)
+   * @returns Enhanced chat request with RAG context attached
    */
   async prepareRagRequest(
     tabId: string,
@@ -347,41 +356,46 @@ export class AIServiceFactory {
         return request;
       }
 
-      // Search vector store for relevant documents
-      const searchResults = await this.searchTabDocuments(
+      // Search vector store with relevance threshold (0.4 = 40% similarity minimum)
+      const searchResults = await this.getVectorStoreService().searchInTab(
         tabId,
         lastUserMessage.content,
         contextLimit
       );
 
-      if (searchResults.length === 0) {
-        const tabDocument = await this.getVectorStoreService().getTabDocument(tabId);
-        if(tabDocument && tabDocument.documents.length > 0 ){
-          const pageContent = tabDocument.documents.map(doc => doc.pageContent).join('\n');
-          return {
-            ...request,
-            generalContext: pageContent
-          }
-        }else{
-          return request;
-        }  
+      // If relevant chunks found, use them as RAG context
+      if (searchResults.length > 0) {
+        this.log('Using RAG context from semantic search', {
+          tabId,
+          resultCount: searchResults.length,
+        });
+        return {
+          ...request,
+          ragContext: {
+            documents: searchResults,
+          },
+        };
       }
 
-      // Add RAG context to request
-      return {
-        ...request,
-        ragContext: {
-          documents: searchResults
-        },
-      };
+      // Fallback: no relevant chunks found, offer full page as context
+      this.log('No relevant chunks found, using full page as fallback', { tabId });
+      const tabDocument = await this.getVectorStoreService().getTabDocument(tabId);
+      if (tabDocument && tabDocument.document) {
+        const { pageContent } = tabDocument.document;
+        return {
+          ...request,
+          generalContext: pageContent,
+        };
+      }
+
+      return request;
     } catch (error) {
       this.logError('Failed to prepare RAG request', error);
       // Return original request if RAG fails
       return request;
     }
-  }  /**
-   * Build context string from search results
-   */
+  }
+
   /**
    * Log debug messages
    */

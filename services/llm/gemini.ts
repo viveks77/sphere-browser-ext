@@ -17,7 +17,6 @@ import {
   AIMessage,
   BaseMessage,
 } from '@langchain/core/messages';
-import { RunnableSequence } from '@langchain/core/runnables';
 
 export class GeminiLLMService extends BaseLLMService {
   private client: ChatGoogleGenerativeAI | null = null;
@@ -75,6 +74,11 @@ export class GeminiLLMService extends BaseLLMService {
       if (request.ragContext && request.ragContext.documents.length > 0) {
         const context = this.buildRagContext(request.ragContext.documents);
         systemPrompt = this.enhanceSystemPromptWithContext(systemPrompt, context);
+      } else if (request.generalContext) {
+        systemPrompt = this.enhanceSystemPromptWithContext(
+          systemPrompt,
+          request.generalContext
+        );
       }
 
       if (systemPrompt) {
@@ -127,8 +131,11 @@ export class GeminiLLMService extends BaseLLMService {
       if (request.ragContext && request.ragContext.documents.length > 0) {
         const context = this.buildRagContext(request.ragContext.documents);
         systemPrompt = this.enhanceSystemPromptWithContext(systemPrompt, context);
-      }else if(request.generalContext){
-        systemPrompt = this.enhanceSystemPromptWithContext(systemPrompt, request.generalContext);
+      } else if (request.generalContext) {
+        systemPrompt = this.enhanceSystemPromptWithContext(
+          systemPrompt,
+          request.generalContext
+        );
       }
 
       if (systemPrompt) {

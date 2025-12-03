@@ -35,26 +35,26 @@ export class ChatService {
   }
 
   /**
-   * Get current tab's session
-   */
-  async getCurrentSession(): Promise<ChatSession | null> {
-    if (!this.factory || !this.currentTabId) {
-      return null;
-    }
-
-    return await this.factory.getTabSession(this.currentTabId);
-  }
-
-  /**
-   * Send a message with RAG context
-   * The LLM service handles RAG internally
+   * Send a message with optional RAG context
+   * 
+   * Flow:
+   * 1. Validates active tab session
+   * 2. Adds user message to conversation history
+   * 3. Optionally prepares RAG context (semantic search + relevance filtering)
+   * 4. Sends request to LLM (which applies context to system prompt)
+   * 5. Stores assistant response in session
+   * 
+   * @param userMessage - User's input text
+   * @param systemPrompt - Optional system instructions
+   * @param enableRag - Whether to use RAG context (default: true)
+   * @param ragContextLimit - Max chunks to retrieve (default: 5)
+   * @param ragThreshold - Relevance threshold for chunks (unused, handled by VectorStore)
+   * @returns LLM response with metadata
    */
   async sendMessage(
     userMessage: string,
     systemPrompt?: string,
-    enableRag: boolean = true,
     ragContextLimit?: number,
-    ragThreshold?: number
   ): Promise<ChatResponse> {
     if (!this.factory || !this.currentTabId) {
       throw new Error('No active tab');
@@ -78,14 +78,13 @@ export class ChatService {
       systemPrompt,
     };
 
-    // Prepare RAG context if enabled
-    if (enableRag) {
-      chatRequest = await this.factory.prepareRagRequest(
-        this.currentTabId,
-        chatRequest,
-        ragContextLimit || 5
-      );
-    }
+    // Prepare context
+    chatRequest = await this.factory.prepareRagRequest(
+      this.currentTabId,
+      chatRequest,
+      ragContextLimit || 5
+    );
+    
 
     // Get response from LLM (which handles RAG if context is present)
     const response = await this.factory.chat(chatRequest);
@@ -102,15 +101,21 @@ export class ChatService {
   }
 
   /**
-   * Stream a message response with RAG context
-   * The LLM service handles RAG internally
+   * Stream a message response with optional RAG context
+   * 
+   * Same flow as sendMessage but yields chunks in real-time
+   * 
+   * @param userMessage - User's input text
+   * @param systemPrompt - Optional system instructions
+   * @param enableRag - Whether to use RAG context (default: true)
+   * @param ragContextLimit - Max chunks to retrieve (default: 5)
+   * @param ragThreshold - Relevance threshold for chunks (unused)
+   * @yields Streamed response chunks
    */
   async *streamMessage(
     userMessage: string,
     systemPrompt?: string,
-    enableRag: boolean = true,
     ragContextLimit?: number,
-    ragThreshold?: number
   ): AsyncGenerator<string, void, unknown> {
     if (!this.factory || !this.currentTabId) {
       throw new Error('No active tab');
@@ -134,14 +139,12 @@ export class ChatService {
       systemPrompt,
     };
 
-    // Prepare RAG context if enabled
-    if (enableRag) {
-      chatRequest = await this.factory.prepareRagRequest(
-        this.currentTabId,
-        chatRequest,
-        ragContextLimit || 5
-      );
-    }
+    // Prepare context
+    chatRequest = await this.factory.prepareRagRequest(
+      this.currentTabId,
+      chatRequest,
+      ragContextLimit || 5
+    );
 
     // Stream response from LLM (which handles RAG if context is present)
     let fullResponse = '';
@@ -182,6 +185,11 @@ export class ChatService {
 
   /**
    * Store webpage content for current tab
+   * 
+   * Chunks the content and indexes for semantic search
+   * 
+   * @param pageContent - Full HTML/text content of the webpage
+   * @param metadata - Optional metadata (URL, title, etc.)
    */
   async storeWebpageContent(
     pageContent: string,

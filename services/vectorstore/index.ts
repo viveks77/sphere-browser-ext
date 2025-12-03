@@ -1,6 +1,7 @@
 import { Document } from '@langchain/core/documents';
 import { Embeddings } from '@langchain/core/embeddings';
 import { MemoryVectorStore } from '@langchain/classic/vectorstores/memory';
+import { RecursiveCharacterTextSplitter } from '@langchain/textsplitters';
 import StorageService from '@/services/storage';
 import {
   SearchResult,
@@ -9,10 +10,10 @@ import {
 
 interface TabDocuments {
   tabId: string;
-  documents: Array<{
+  document: {
     pageContent: string;
     metadata?: Record<string, unknown>;
-  }>;
+  };
   updatedAt: number;
 }
 
@@ -37,6 +38,38 @@ export class VectorStoreService {
     this.debug = config.debug ?? false;
   }
 
+  private async generateChunkedDocuments(
+    tabId: string,
+    pageContent: string,
+    metadata?: Record<string, unknown>
+  ): Promise<Document[]> {
+    // Split page content into chunks for better semantic search
+    // 500 chars per chunk with 100 chars overlap for context continuity
+    const splitter = new RecursiveCharacterTextSplitter({
+      chunkSize: 500,
+      chunkOverlap: 100,
+      separators: ['\n\n', '\n', '. ', ' ', ''],
+    });
+
+    const chunks = await splitter.splitText(pageContent);
+    this.log('Split page into chunks', { tabId, chunkCount: chunks.length });
+
+    // Create documents from chunks
+    const documents = chunks.map((chunk, index) => 
+      new Document({
+        pageContent: chunk,
+        metadata: {
+          ...metadata,
+          tabId,
+          chunkIndex: index,
+          totalChunks: chunks.length,
+          addedAt: Date.now(),
+        },
+      })
+    );
+    return documents;
+  }
+
   /**
    * Get or create vector store for a tab
    */
@@ -56,16 +89,9 @@ export class VectorStoreService {
       'session'
     );
 
-    if (tabDocs && tabDocs.documents && tabDocs.documents.length > 0) {
+    if (tabDocs && tabDocs.document) {
       try {
-        const documents = tabDocs.documents.map(
-          (doc) =>
-            new Document({
-              pageContent: doc.pageContent,
-              metadata: doc.metadata || {},
-            })
-        );
-
+        const documents = await this.generateChunkedDocuments(tabId, tabDocs.document.pageContent, tabDocs.document.metadata);
         // Add documents to the vector store
         await vectorStore.addDocuments(documents);
         this.log('Loaded tab documents from storage', { tabId, count: documents.length });
@@ -88,9 +114,13 @@ export class VectorStoreService {
   ): Promise<void> {
     try {
       const vectorStore = await this.getOrCreateTabVectorStore(tabId);
+      const documents = await this.generateChunkedDocuments(tabId, pageContent, metadata);
 
-      // Create document with metadata
-      const document = new Document({
+      // Add to LangChain MemoryVectorStore
+      await vectorStore.addDocuments(documents);
+
+      // Persist to storage (keep full content for fallback)
+      const fullDocument = new Document({
         pageContent,
         metadata: {
           ...metadata,
@@ -98,14 +128,12 @@ export class VectorStoreService {
           addedAt: Date.now(),
         },
       });
+      await this.persistTabDocuments(tabId, fullDocument);
 
-      // Add to LangChain MemoryVectorStore
-      await vectorStore.addDocuments([document]);
-
-      // Persist to storage
-      await this.persistTabDocuments(tabId, document);
-
-      this.log('Successfully added webpage to tab', { tabId });
+      this.log('Successfully added webpage to tab', { 
+        tabId, 
+        chunkCount: documents.length,
+      });
     } catch (error) {
       this.logError('Failed to add webpage to tab', error);
       throw error;
@@ -118,30 +146,43 @@ export class VectorStoreService {
   async searchInTab(
     tabId: string,
     query: string,
-    limit: number = 5
+    limit: number = 5,
+    relevanceThreshold: number = 0.4
   ): Promise<SearchResult[]> {
     try {
       this.log('Searching tab documents', {
         tabId,
         query: query.substring(0, 50),
         limit,
+        relevanceThreshold,
       });
 
       const vectorStore = await this.getOrCreateTabVectorStore(tabId);
 
       // Use LangChain's similaritySearchWithScore
-      const results = await vectorStore.similaritySearchWithScore(query, limit);
+      const results = await vectorStore.similaritySearchWithScore(query, limit * 2);
 
-      // Convert results to SearchResult format
+      // Convert results to SearchResult format and filter by relevance threshold
       const searchResults: SearchResult[] = results
-        .map(([doc, score]) => ({
-          id: `${tabId}_${Date.now()}`,
-          text: doc.pageContent,
-          score: 1 - score, // Convert distance to similarity
-          metadata: doc.metadata,
-        }));
+        .map(([doc, score]) => {
+          const similarity = 1 - score; // Convert distance to similarity
+          return {
+            id: `${tabId}_${Date.now()}`,
+            text: doc.pageContent,
+            score: similarity,
+            metadata: doc.metadata,
+          };
+        })
+        .filter((result) => result.score >= relevanceThreshold)
+        .slice(0, limit);
 
-      this.log('Search completed', { tabId, resultCount: searchResults.length });
+      this.log('Search completed', { 
+        tabId, 
+        resultCount: searchResults.length,
+        avgScore: searchResults.length > 0 
+          ? (searchResults.reduce((sum, r) => sum + r.score, 0) / searchResults.length).toFixed(2)
+          : 'N/A',
+      });
       return searchResults;
     } catch (error) {
       this.logError('Search failed', error);
@@ -163,15 +204,23 @@ export class VectorStoreService {
     }
   }
 
+  /**
+   * Retrieve full tab document from storage for fallback context
+   * Returns null if document doesn't exist or has no content
+   */
   async getTabDocument(tabId: string): Promise<TabDocuments | null> {
-    try{
+    try {
       const storageKey = `tab_documents_${tabId}`;
-      const tabDocument = await this.storageService.getItem<TabDocuments>(storageKey, 'session');
-      if(!tabDocument || tabDocument.documents.length == 0 ){
+      const tabDocument = await this.storageService.getItem<TabDocuments>(
+        storageKey,
+        'session'
+      );
+      if (!tabDocument || !tabDocument.document) {
         return null;
       }
       return tabDocument;
-    }catch(error){
+    } catch (error) {
+      this.logError('Failed to retrieve tab document', error);
       return null;
     }
   }
@@ -208,7 +257,7 @@ export class VectorStoreService {
       // Get documents from MemoryVectorStore
       const tabDocs: TabDocuments = {
         tabId,
-        documents: [document],
+        document: document,
         updatedAt: Date.now(),
       };
       const storageKey = `tab_documents_${tabId}`;

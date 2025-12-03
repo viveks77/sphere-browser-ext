@@ -11,6 +11,18 @@ export default defineContentScript({
       debug: true,
       timeout: 30000,
     });
+    
+    contentRouter.registerHandler(MessageTypes.GET_SESSION, (payload) => {
+      const url = window.location.href;
+      if(url == null) {
+        throw new Error('No Url Found');
+      }
+      const id = generateUniqueId(url);
+      return {
+        id: id,
+        url: url
+      }
+    });
 
     // Register handler with proper typing
     contentRouter.registerHandler<unknown, PageInfo>(MessageTypes.INITIALIZE_CHAT, (payload) => {

@@ -14,6 +14,15 @@ export default defineBackground(() => {
     timeout: 30000,
   });
 
+
+  router.registerHandler(MessageTypes.GET_SESSION, async (payload: PageInfo) => {
+    const {id} = payload;
+
+    const session = await chatService.setCurrentTab(id);
+    console.log('Tab session created/loaded', session);
+    return session;
+  })
+  
   router.registerHandler(MessageTypes.INITIALIZE_CHAT, async (payload: PageInfo) => {
     console.log(`[Paylod Info for message Type - ${MessageTypes.INITIALIZE_CHAT}]`, payload)
 
@@ -24,7 +33,6 @@ export default defineBackground(() => {
     console.log('Tab session loaded/created:', session);
 
     const tabDocument = await chatService.getTabDocumentCount();
-    console.log('tabdocument length', tabDocument, payload?.content);
     if(tabDocument  == 0){
       await chatService.storeWebpageContent(payload?.content, {title: payload?.title, url: payload?.url});
     }
