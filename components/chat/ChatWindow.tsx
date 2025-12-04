@@ -11,6 +11,7 @@ interface ChatWindowProps {
   isLoading?: boolean;
   isInitializing?: boolean;
   error?: string;
+  onRetry?: (id: string) => void | Promise<void>;
 }
 
 export const ChatWindow: React.FC<ChatWindowProps> = ({
@@ -19,6 +20,7 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
   error,
   isLoading = false,
   isInitializing = false,
+  onRetry,
 }) => {
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -79,7 +81,11 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
         ) : (
           <>
             {messages.map((message) => (
-              <ChatMessage key={message.id || message.timestamp} message={message} />
+              <ChatMessage 
+                key={message.id || message.timestamp} 
+                message={message} 
+                onRetry={onRetry}
+              />
             ))}
             {isLoading && (
               <div className="flex gap-3">

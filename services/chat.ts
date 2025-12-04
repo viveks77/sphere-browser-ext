@@ -53,6 +53,7 @@ export class ChatService {
    */
   async sendMessage(
     userMessage: string,
+    userMessageId: string,
     systemPrompt?: string,
     ragContextLimit?: number,
   ): Promise<ChatResponse> {
@@ -67,14 +68,15 @@ export class ChatService {
 
     // Add user message to session
     const userMsg: ChatMessage = {
+      id: userMessageId,
       role: 'user',
       content: userMessage,
+      status: 'sent',
+      timestamp: Date.now(),
     };
-    await this.factory.addMessageToTabSession(this.currentTabId, userMsg);
-
     // Create chat request
     let chatRequest: ChatRequest = {
-      messages: session.messages,
+      messages: [...session.messages, userMsg],
       systemPrompt,
     };
 
@@ -85,16 +87,19 @@ export class ChatService {
       ragContextLimit || 5
     );
     
-
     // Get response from LLM (which handles RAG if context is present)
     const response = await this.factory.chat(chatRequest);
 
-    // Add assistant message to session
+    // // Add assistant message to session
     const assistantMsg: ChatMessage = {
       role: 'assistant',
       content: response.content,
       id: response.id,
+      status: 'sent',
+      timestamp: Date.now(),
     };
+    await this.factory.addMessageToTabSession(this.currentTabId, userMsg);
+
     await this.factory.addMessageToTabSession(this.currentTabId, assistantMsg);
 
     return response;

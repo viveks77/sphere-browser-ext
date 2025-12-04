@@ -10,10 +10,7 @@ export class BackgroundRouter extends BaseRouter {
     // Check if handler exists
     if (!this.hasHandler(type)) {
       this.log(`No handler found for type: "${type}"`);
-      return this.createErrorResponse(
-        "HANDLER_NOT_FOUND",
-        `No handler registered for message type: "${type}"`
-      );
+      return Promise.reject("NO_HANDLER: " + `No handler registered for message type "${type}"`);
     }
 
     try {
@@ -29,13 +26,10 @@ export class BackgroundRouter extends BaseRouter {
 
       this.log(`Message handled successfully for type: "${type}"`, result);
 
-      return result;
+      return this.createSuccessResponse(result);
     } catch (error) {
       this.logError(`Error in BackgroundRouter: ${error}`);
-      return this.createErrorResponse(
-        "HANDLER_EXECUTION_ERROR",
-        error instanceof Error ? error.message : "Handler execution failed"
-      );
+      return Promise.reject("HANDLER_EXECUTION_ERROR: " + (error instanceof Error ? error.message : "Handler execution failed"));
     }
   }
 }

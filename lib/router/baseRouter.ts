@@ -160,22 +160,10 @@ export class BaseRouter {
       return;
     }
 
-    // Execute with timeout
-    const timeoutId = setTimeout(() => {
-      this.logError(`Message timeout for type: "${msg.type}"`);
-      sendResponse(
-        this.createErrorResponse(
-          "MESSAGE_TIMEOUT",
-          `Request exceeded ${this.options.timeout}ms timeout`
-        )
-      );
-    }, this.options.timeout);
-
     this.routeMessage(msg).then((response) => {
-        clearTimeout(timeoutId);
+        console.log('base router response', response);
         sendResponse(response);
       }).catch((error) => {
-        clearTimeout(timeoutId);
         this.logError(`Route error for type "${msg.type}":`);
         sendResponse(
           this.createErrorResponse("ROUTING_ERROR",error instanceof Error ? error.message : "Unknown error occurred")

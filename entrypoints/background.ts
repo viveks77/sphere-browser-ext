@@ -23,22 +23,27 @@ export default defineBackground(() => {
     return session;
   })
   
-  router.registerHandler(MessageTypes.INITIALIZE_CHAT, async (payload: PageInfo & {query: string}) => {
+  router.registerHandler(MessageTypes.INITIALIZE_CHAT, async (payload: PageInfo & {query: string, messageId: string}) => {
     console.log(`[Paylod Info for message Type - ${MessageTypes.INITIALIZE_CHAT}]`, payload)
-
-    const {id, query} = payload;
+    try{
+      const {id, query, messageId} = payload;
     
-    // Load or create session for this tab
-    const session = await chatService.setCurrentTab(id);
+      // Load or create session for this tab
+      const session = await chatService.setCurrentTab(id);
 
-    const tabDocument = await chatService.getTabDocumentCount();
-    if(tabDocument  == 0){
-      await chatService.storeWebpageContent(payload?.content, {title: payload?.title, url: payload?.url});
+      const tabDocument = await chatService.getTabDocumentCount();
+      if(tabDocument  == 0){
+        await chatService.storeWebpageContent(payload?.content, {title: payload?.title, url: payload?.url});
+      }
+      const response = await chatService.sendMessage(query, messageId);
+      // const response = await chatService.getFactory().searchTabDocuments(payload.id, "what is mcp ?");
+      console.log('LLM Response for summary', response);
+      return response;
+    }catch(error){
+      console.log(error);
+      throw new Error('error in background');
     }
-    const response = await chatService.sendMessage(query, undefined);
-    // const response = await chatService.getFactory().searchTabDocuments(payload.id, "what is mcp ?");
-    console.log('LLM Response for summary', response);
-    return response;
+    
   });  
   // Start listening for messages
   router.startListener().catch((error) => {

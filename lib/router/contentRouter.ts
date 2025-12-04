@@ -10,10 +10,7 @@ export class ContentRouter extends BaseRouter {
     // Check if handler exists
     if (!this.hasHandler(type)) {
       this.log(`No handler found for type: "${type}"`);
-      return this.createErrorResponse(
-        "HANDLER_NOT_FOUND",
-        `No handler registered for message type: "${type}"`
-      );
+      return Promise.reject(`HANDLER_NOT_FOUND: No handler registered for message type: "${type}"`);
     }
 
     try {
@@ -24,11 +21,10 @@ export class ContentRouter extends BaseRouter {
         throw new Error(`Handler disappeared for type: "${type}"`);
       }
 
-      // Execute handler and await result
-      const result = await Promise.resolve(handler(payload));
-
       // Send back to background script
       try {
+        const result = await Promise.resolve(handler(payload));
+
         const backgroundResponse = await browser.runtime.sendMessage({
           type: type,
           payload: result,
@@ -39,7 +35,7 @@ export class ContentRouter extends BaseRouter {
           backgroundResponse
         );
 
-        return this.createSuccessResponse(backgroundResponse);
+        return backgroundResponse;
       } catch (sendError) {
         this.logError(`Failed to send message to background: ${sendError}`);
         throw new Error(
@@ -50,10 +46,7 @@ export class ContentRouter extends BaseRouter {
       }
     } catch (error) {
       this.logError(`Error in ContentRouter: ${error}`);
-      return this.createErrorResponse(
-        "HANDLER_EXECUTION_ERROR",
-        error instanceof Error ? error.message : "Handler execution failed"
-      );
+      return Promise.reject(error);
     }
   }
 }

@@ -349,7 +349,7 @@ export class AIServiceFactory {
     try {
       // Get last user message for search query
       const lastUserMessage = request.messages
-        .reverse()
+        .toReversed()
         .find((m) => m.role === 'user');
 
       if (!lastUserMessage) {
