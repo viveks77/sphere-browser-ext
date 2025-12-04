@@ -29,7 +29,7 @@ export class BackgroundRouter extends BaseRouter {
 
       this.log(`Message handled successfully for type: "${type}"`, result);
 
-      return this.createSuccessResponse(result);
+      return result;
     } catch (error) {
       this.logError(`Error in BackgroundRouter: ${error}`);
       return this.createErrorResponse(

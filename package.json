@@ -16,6 +16,7 @@
   },
   "dependencies": {
     "@langchain/classic": "^1.0.5",
+    "@langchain/core": "^1.1.2",
     "@langchain/google-genai": "^1.0.3",
     "@langchain/openai": "^1.1.2",
     "@radix-ui/react-dialog": "^1.1.15",
@@ -33,6 +34,7 @@
     "lucide-react": "^0.554.0",
     "react": "^19.1.1",
     "react-dom": "^19.1.1",
+    "react-markdown": "^10.1.0",
     "shadcn": "^3.5.0",
     "tailwind-merge": "^3.4.0",
     "tailwindcss": "^4.1.17",

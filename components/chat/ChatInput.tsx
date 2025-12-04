@@ -15,7 +15,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
   placeholder = 'Ask a question...',
 }) => {
   const [message, setMessage] = useState('');
-  const inputRef = useRef<HTMLInputElement>(null);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
   
   const handleSend = async () => {
     if (!message.trim() || isLoading) return;
@@ -43,11 +43,12 @@ export const ChatInput: React.FC<ChatInputProps> = ({
       <div className="flex gap-2 relative text-sm">
         <Textarea
           value={message}
+          ref={inputRef}
           onChange={(e) => setMessage(e.target.value)}
           onKeyDown={handleKeyPress}
           placeholder={placeholder}
           disabled={isLoading}
-          className="pr-12 py-2 bg-muted/50 border-transparent focus-visible:bg-background focus-visible:ring-1 focus-visible:ring-primary/20 transition-all shadow-sm"
+          className="text-sm pr-12 py-2 bg-muted/50 border-transparent focus-visible:bg-background focus-visible:ring-1 focus-visible:ring-primary/20 transition-all shadow-sm"
         />
         <Button
           onClick={handleSend}

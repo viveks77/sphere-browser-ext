@@ -147,7 +147,7 @@ export class VectorStoreService {
     tabId: string,
     query: string,
     limit: number = 5,
-    relevanceThreshold: number = 0.4
+    relevanceThreshold: number = 0.7
   ): Promise<SearchResult[]> {
     try {
       this.log('Searching tab documents', {
@@ -179,6 +179,7 @@ export class VectorStoreService {
       this.log('Search completed', { 
         tabId, 
         resultCount: searchResults.length,
+        result: searchResults,
         avgScore: searchResults.length > 0 
           ? (searchResults.reduce((sum, r) => sum + r.score, 0) / searchResults.length).toFixed(2)
           : 'N/A',

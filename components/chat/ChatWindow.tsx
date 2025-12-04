@@ -10,11 +10,13 @@ interface ChatWindowProps {
   onSendMessage: (message: string) => void | Promise<void>;
   isLoading?: boolean;
   isInitializing?: boolean;
+  error?: string;
 }
 
 export const ChatWindow: React.FC<ChatWindowProps> = ({
   messages,
   onSendMessage,
+  error,
   isLoading = false,
   isInitializing = false,
 }) => {
@@ -28,8 +30,10 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
     scrollToBottom();
   }, [messages]);
 
+  console.log('Messages', messages);
+
   return (
-    <div className="flex h-full flex-col min-w-[350px] bg-background font-sans">
+    <div className="flex h-full flex-col min-w-[450px] bg-background font-sans">
       {/* Header */}
       <div className="px-4 py-4 border-b border-border/40 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 sticky top-0 z-10">
         <div className="flex items-center gap-2.5">
@@ -41,8 +45,7 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
             <p className="text-xs text-muted-foreground mt-1">Ask questions about this page</p>
           </div>
         </div>
-      </div>
-
+      </div> 
       {/* Messages Area */}
       <div className="flex-1 overflow-y-auto p-4 space-y-6 scroll-smooth">
         {isInitializing ? (
@@ -97,6 +100,12 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
         )}
       </div>
 
+      {error && (
+        <div className='p-2 m-2 border-1 border-red-500 bg-red-50 rounded-lg shadow-sm'> 
+          <span className='text-red-500'>{error}</span>
+        </div>
+      )}
+      
       {/* Input Area */}
       <ChatInput onSendMessage={onSendMessage} isLoading={isLoading} />
     </div>

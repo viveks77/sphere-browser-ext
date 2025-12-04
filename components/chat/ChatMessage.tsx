@@ -2,6 +2,7 @@ import React from 'react';
 import { ChatMessage as ChatMessageType } from '@/lib/models';
 import { cn } from '@/lib/utils';
 import { User, Bot } from 'lucide-react';
+import Markdown from 'react-markdown'
 
 interface ChatMessageProps {
   message: ChatMessageType;
@@ -42,7 +43,7 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({ message }) => {
               : 'bg-muted text-foreground rounded-tl-none'
           )}
         >
-          <p className="whitespace-pre-wrap break-words">{message.content}</p>
+          <Markdown>{message.content}</Markdown>
         </div>
         {message.timestamp && (
           <span className="text-[10px] text-muted-foreground/60 px-1">

@@ -92,6 +92,7 @@ export class GeminiLLMService extends BaseLLMService {
         model: this.config.model || 'gemini-2.0-flash',
         timestamp: Date.now(),
         metadata: request.metadata,
+        id: Date.now().toString()
       };
 
       this.log('Received response from Gemini', {

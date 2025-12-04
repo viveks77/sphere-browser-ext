@@ -23,23 +23,22 @@ export default defineBackground(() => {
     return session;
   })
   
-  router.registerHandler(MessageTypes.INITIALIZE_CHAT, async (payload: PageInfo) => {
+  router.registerHandler(MessageTypes.INITIALIZE_CHAT, async (payload: PageInfo & {query: string}) => {
     console.log(`[Paylod Info for message Type - ${MessageTypes.INITIALIZE_CHAT}]`, payload)
 
-    const {id} = payload;
+    const {id, query} = payload;
     
     // Load or create session for this tab
     const session = await chatService.setCurrentTab(id);
-    console.log('Tab session loaded/created:', session);
 
     const tabDocument = await chatService.getTabDocumentCount();
     if(tabDocument  == 0){
       await chatService.storeWebpageContent(payload?.content, {title: payload?.title, url: payload?.url});
     }
-    // const response = await chatService.sendMessage("what is at the bottom of the page ?", undefined, true);
-    const response = await chatService.getFactory().searchTabDocuments(payload.id, "what is mcp ?");
+    const response = await chatService.sendMessage(query, undefined);
+    // const response = await chatService.getFactory().searchTabDocuments(payload.id, "what is mcp ?");
     console.log('LLM Response for summary', response);
-
+    return response;
   });  
   // Start listening for messages
   router.startListener().catch((error) => {

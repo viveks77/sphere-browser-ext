@@ -25,7 +25,7 @@ export default defineContentScript({
     });
 
     // Register handler with proper typing
-    contentRouter.registerHandler<unknown, PageInfo>(MessageTypes.INITIALIZE_CHAT, (payload) => {
+    contentRouter.registerHandler<{query: string}, PageInfo>(MessageTypes.INITIALIZE_CHAT, (payload) => {
       const browserContent = document.body.innerText;
       const url = window.location.href;
       const title = document.title;
@@ -39,7 +39,8 @@ export default defineContentScript({
         id: id,
         content: browserContent,
         url: url,
-        title: title
+        title: title,
+        query: payload.query
       }
     });
 
