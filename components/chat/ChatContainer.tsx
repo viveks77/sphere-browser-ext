@@ -5,7 +5,7 @@ import { useChat } from '@/hooks/useChat';
 
 
 export const ChatContainer: React.FC = () => {
-  const {messages, isLoading, sendMessage, error, retryMessage} = useChat();
+  const {messages, isLoading, sendMessage, error, retryMessage, enableRag, setEnableRag} = useChat();
 
   return (
     <ChatWindow
@@ -15,6 +15,8 @@ export const ChatContainer: React.FC = () => {
       error={error}
       isInitializing={false}
       onRetry={retryMessage}
+      enableRag={enableRag}
+      setEnableRag={setEnableRag}
     />
   );
 };

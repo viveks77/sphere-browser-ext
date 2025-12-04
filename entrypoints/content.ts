@@ -40,8 +40,7 @@ export default defineContentScript({
         content: browserContent,
         url: url,
         title: title,
-        query: payload.query,
-        messageId: payload.messageId,
+        ...payload,
       }
     });
 

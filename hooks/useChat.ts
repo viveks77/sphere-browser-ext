@@ -9,6 +9,7 @@ export const useChat = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [isInitialized, setIsInitialized] = useState(false);
   const [error, setError] = useState<string | undefined>(undefined);
+  const [enableRag, setEnableRag] = useState<boolean>(true);
 
   useEffect(() => {
     initializeTab();
@@ -68,9 +69,10 @@ export const useChat = () => {
           payload: {
             query: content,
             messageId: messageId,
+            enableRag: true,
           }
         });
-        console.log(response);
+        
         if(response?.success){
           const data = response.data;
           const chatResponse: ChatMessageType = {
@@ -122,14 +124,7 @@ export const useChat = () => {
   }, [messages, sendMessage]);
 
   const clearMessages = useCallback(() => {
-    setMessages([
-      {
-        id: '1',
-        role: 'assistant',
-        content: 'Hello! I\'m your AI assistant. Ask me anything about this page.',
-        timestamp: Date.now(),
-      },
-    ]);
+    setMessages([]);
     setError(undefined);
   }, []);
 
@@ -138,8 +133,10 @@ export const useChat = () => {
     isLoading,
     isInitialized,
     error,
+    enableRag,
     sendMessage,
     retryMessage,
     clearMessages,
+    setEnableRag,
   };
 };

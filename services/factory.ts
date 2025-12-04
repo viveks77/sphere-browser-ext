@@ -344,6 +344,7 @@ export class AIServiceFactory {
   async prepareRagRequest(
     tabId: string,
     request: ChatRequest,
+    enableRag: boolean = true,
     contextLimit: number = 5
   ): Promise<ChatRequest> {
     try {
@@ -355,7 +356,17 @@ export class AIServiceFactory {
       if (!lastUserMessage) {
         return request;
       }
-
+      
+      const tabDocument = await this.getVectorStoreService().getTabDocument(tabId);
+      if(!enableRag){
+        if (tabDocument && tabDocument.document) {
+        const { pageContent } = tabDocument.document;
+        return {
+          ...request,
+          generalContext: pageContent,
+        };
+      }
+      }
       // Search vector store with relevance threshold (0.4 = 40% similarity minimum)
       const searchResults = await this.getVectorStoreService().searchInTab(
         tabId,
@@ -379,7 +390,6 @@ export class AIServiceFactory {
 
       // Fallback: no relevant chunks found, offer full page as context
       this.log('No relevant chunks found, using full page as fallback', { tabId });
-      const tabDocument = await this.getVectorStoreService().getTabDocument(tabId);
       if (tabDocument && tabDocument.document) {
         const { pageContent } = tabDocument.document;
         return {

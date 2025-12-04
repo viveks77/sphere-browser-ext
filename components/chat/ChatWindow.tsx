@@ -12,6 +12,8 @@ interface ChatWindowProps {
   isInitializing?: boolean;
   error?: string;
   onRetry?: (id: string) => void | Promise<void>;
+  enableRag?: boolean;
+  setEnableRag?: (enable: boolean) => void;
 }
 
 export const ChatWindow: React.FC<ChatWindowProps> = ({
@@ -21,6 +23,8 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
   isLoading = false,
   isInitializing = false,
   onRetry,
+  enableRag,
+  setEnableRag,
 }) => {
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -32,7 +36,6 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
     scrollToBottom();
   }, [messages]);
 
-  console.log('Messages', messages);
 
   return (
     <div className="flex h-full flex-col min-w-[450px] bg-background font-sans">
@@ -107,13 +110,13 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
       </div>
 
       {error && (
-        <div className='p-2 m-2 border-1 border-red-500 bg-red-50 rounded-lg shadow-sm'> 
+        <div className='p-2 m-2 border border-red-500 bg-red-50 rounded-lg shadow-sm'> 
           <span className='text-red-500'>{error}</span>
         </div>
       )}
       
       {/* Input Area */}
-      <ChatInput onSendMessage={onSendMessage} isLoading={isLoading} />
+      <ChatInput enableRag={enableRag} setEnableRag={setEnableRag} onSendMessage={onSendMessage} isLoading={isLoading} />
     </div>
   );
 };

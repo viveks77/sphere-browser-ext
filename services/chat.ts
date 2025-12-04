@@ -55,6 +55,7 @@ export class ChatService {
     userMessage: string,
     userMessageId: string,
     systemPrompt?: string,
+    enableRag?:boolean,
     ragContextLimit?: number,
   ): Promise<ChatResponse> {
     if (!this.factory || !this.currentTabId) {
@@ -84,6 +85,7 @@ export class ChatService {
     chatRequest = await this.factory.prepareRagRequest(
       this.currentTabId,
       chatRequest,
+      enableRag,
       ragContextLimit || 5
     );
     
@@ -120,6 +122,7 @@ export class ChatService {
   async *streamMessage(
     userMessage: string,
     systemPrompt?: string,
+    enableRag?:boolean,
     ragContextLimit?: number,
   ): AsyncGenerator<string, void, unknown> {
     if (!this.factory || !this.currentTabId) {
@@ -148,6 +151,7 @@ export class ChatService {
     chatRequest = await this.factory.prepareRagRequest(
       this.currentTabId,
       chatRequest,
+      enableRag,
       ragContextLimit || 5
     );
 
