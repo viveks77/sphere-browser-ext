@@ -46,10 +46,13 @@ export const useChat = () => {
       if (!currentTab.id) {
           console.error("No active tab found");
           return;
-        }
-
+      }
+      
       const response = await browser.tabs.sendMessage<unknown, Response<ChatSession>>(currentTab.id, {
         type: MessageTypes.GET_SESSION,
+        payload: {
+          tabId: currentTab.id,
+        }
       });
 
       if (response?.success) {
@@ -88,10 +91,11 @@ export const useChat = () => {
         if(!currentTab.id){
           throw new Error('No active tab found');
         }
-
+        
         const response = await browser.tabs.sendMessage<unknown, Response<ChatResponse>>(currentTab.id, {
           type: MessageTypes.INITIALIZE_CHAT,
           payload: {
+            tabId: currentTab.id,
             query: content,
             messageId: messageId,
             enableRag: true,

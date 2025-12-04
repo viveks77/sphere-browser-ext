@@ -74,7 +74,7 @@ export default defineBackground(async () => {
 
         // Load or create session for this tab
         const session = await chatService!.setCurrentTab(id);
-
+        console.log('session', session);
         // Store webpage content if not already stored
         const tabDocumentCount = await chatService!.getTabDocumentCount();
         if (tabDocumentCount === 0 && content) {

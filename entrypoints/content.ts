@@ -12,12 +12,14 @@ export default defineContentScript({
       timeout: 30000,
     });
     
-    contentRouter.registerHandler(MessageTypes.GET_SESSION, (payload) => {
+    contentRouter.registerHandler(MessageTypes.GET_SESSION, (payload: {tabId: string}) => {
       const url = window.location.href;
-      if(url == null) {
+      const tabId = payload?.tabId;
+      
+      if(url == null || tabId == null) {
         throw new Error('No Url Found');
       }
-      const id = generateUniqueId(url);
+      const id = generateUniqueId(tabId);
       return {
         id: id,
         url: url
@@ -25,7 +27,7 @@ export default defineContentScript({
     });
 
     // Register handler with proper typing
-    contentRouter.registerHandler<{query: string, messageId: string}, PageInfo>(MessageTypes.INITIALIZE_CHAT, (payload) => {
+    contentRouter.registerHandler<{query: string, messageId: string, tabId: string}, PageInfo>(MessageTypes.INITIALIZE_CHAT, (payload) => {
       const browserContent = document.body.innerText;
       const url = window.location.href;
       const title = document.title;
@@ -34,7 +36,7 @@ export default defineContentScript({
         throw new Error('No Url Found');
       }
 
-      const id = generateUniqueId(url);
+      const id = generateUniqueId(payload.tabId);
       return {
         id: id,
         content: browserContent,
