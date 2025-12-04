@@ -52,10 +52,10 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({ message, onRetry }) =>
         >
           <Markdown
             components={{
-              p: ({ children }) => <p className="mb-1 last:mb-0 break-words">{children}</p>,
+              p: ({ children }) => <p className="mb-1 last:mb-0 break-all">{children}</p>,
               ul: ({ children }) => <ul className="list-disc pl-4 mb-2 space-y-1">{children}</ul>,
               ol: ({ children }) => <ol className="list-decimal pl-4 mb-2 space-y-1">{children}</ol>,
-              li: ({ children }) => <li className="break-words">{children}</li>,
+              li: ({ children }) => <li className="break-all">{children}</li>,
               a: ({ href, children }) => (
                 <a 
                   href={href} 

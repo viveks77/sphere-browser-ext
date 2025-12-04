@@ -40,7 +40,7 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
   return (
     <div className="flex h-full flex-col min-w-[450px] bg-background font-sans">
       {/* Header */}
-      <div className="px-4 py-4 border-b border-border/40 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 sticky top-0 z-10">
+      <div className="sticky top-0 z-10 border-b border-border/40 bg-background/95 px-4 py-4 backdrop-blur supports-backdrop-filter:bg-background/60">
         <div className="flex items-center gap-2.5">
           <div className="bg-primary/10 p-2 rounded-lg">
             <Bot className="w-5 h-5 text-primary" />

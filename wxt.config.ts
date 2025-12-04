@@ -1,6 +1,8 @@
 import tailwindcss from '@tailwindcss/vite';
 import { defineConfig } from 'wxt';
-import path from "path";
+import path from 'path';
+
+const PATH_ALIAS = path.resolve(__dirname, '');
 
 export default defineConfig({
   manifest: {
@@ -10,9 +12,9 @@ export default defineConfig({
     plugins: [tailwindcss()],
     resolve: {
       alias: {
-        "@": path.resolve(__dirname, ""),
-      }
-    }
+        '@': PATH_ALIAS,
+      },
+    },
   }),
   modules: ['@wxt-dev/module-react'],
 });

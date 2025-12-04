@@ -1,22 +1,47 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { ChatMessage as ChatMessageType, ChatResponse, ChatSession } from '@/lib/models';
 import { MessageTypes } from '@/lib/constants';
-import {Response } from '@/lib/types';
+import { Response } from '@/lib/types';
+import { isConfigured } from '@/lib/configLoader';
 
 export const useChat = () => {
-
-  const [messages, setMessages] = useState<ChatMessageType[]>([] );
+  const [messages, setMessages] = useState<ChatMessageType[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isInitialized, setIsInitialized] = useState(false);
   const [error, setError] = useState<string | undefined>(undefined);
   const [enableRag, setEnableRag] = useState<boolean>(true);
+  const currentTabIdRef = useRef<number | null>(null);
 
+  // Initialize tab on mount and listen for tab changes
   useEffect(() => {
+    // Initial load
     initializeTab();
-  }, [])
+
+    // Listen for active tab changes
+    const tabChangeListener = (activeInfo: { tabId: number; windowId: number }) => {
+      if (currentTabIdRef.current !== activeInfo.tabId) {
+        currentTabIdRef.current = activeInfo.tabId;
+        // Reload the session when tab changes
+        initializeTab();
+      }
+    };
+
+    browser.tabs.onActivated.addListener(tabChangeListener);
+
+    return () => {
+      browser.tabs.onActivated.removeListener(tabChangeListener);
+    };
+  }, []);
   
   async function initializeTab(){
     try{
+      const configured = await isConfigured();
+      if (!configured) {
+        setError('Extension not configured. Please visit the options page to add your API credentials.');
+        setIsInitialized(true);
+        return;
+      }
+
       const [currentTab] = await browser.tabs.query({active: true, currentWindow: true});
       if (!currentTab.id) {
           console.error("No active tab found");

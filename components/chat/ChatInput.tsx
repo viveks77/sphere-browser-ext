@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Send, Loader2, SlidersHorizontal } from 'lucide-react';
@@ -11,18 +11,20 @@ interface ChatInputProps {
   setEnableRag?: (enable: boolean) => void;
 }
 
+const DEFAULT_PLACEHOLDER = 'Ask a question...';
+
 export const ChatInput: React.FC<ChatInputProps> = ({
   onSendMessage,
   isLoading = false,
-  placeholder = 'Ask a question...',
-  enableRag,
-  setEnableRag
+  placeholder = DEFAULT_PLACEHOLDER,
+  enableRag = true,
+  setEnableRag,
 }) => {
   const [message, setMessage] = useState('');
   const [showOptions, setShowOptions] = useState(false);
   const inputRef = useRef<HTMLTextAreaElement>(null);
-  
-  const handleSend = async () => {
+
+  const handleSend = useCallback(async () => {
     if (!message.trim() || isLoading) return;
 
     const messageText = message;
@@ -34,63 +36,81 @@ export const ChatInput: React.FC<ChatInputProps> = ({
       console.error('Error sending message:', error);
       setMessage(messageText);
     }
-  };
+  }, [message, isLoading, onSendMessage]);
 
-  const handleKeyPress = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+  const handleKeyDown = useCallback((e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       handleSend();
     }
-  };
+  }, [handleSend]);
+
+  const toggleOptions = useCallback(() => {
+    setShowOptions((prev) => !prev);
+  }, []);
+
+  const handleRagToggle = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      setEnableRag?.(e.target.checked);
+    },
+    [setEnableRag]
+  );
 
   return (
-    <div className="p-4 bg-background border-t border-border/40 relative">
-      {/* Options Slide-up */}
-      <div 
-        className={`absolute bottom-full left-0 w-full bg-background border-t border-border/40 px-4 pt-4 transition-all duration-300 ease-in-out ${
+    <div className="relative border-t border-border/40 bg-background p-4">
+      {/* Options Slide-up Panel */}
+      <div
+        className={`absolute bottom-full left-0 w-full border-t border-border/40 bg-background px-4 pt-4 transition-all duration-300 ease-in-out ${
           showOptions ? 'translate-y-0 opacity-100' : 'translate-y-4 opacity-0 pointer-events-none'
         }`}
       >
         <div className="flex items-center gap-2">
-          <label className="pl-1 flex items-center gap-2 text-sm cursor-pointer select-none">
+          <label className="flex cursor-pointer select-none items-center gap-2 pl-1 text-sm">
             <input
               type="checkbox"
               checked={enableRag}
-              onChange={(e) => setEnableRag?.(e.target.checked)}
-              className="w-4 h-4 rounded border-primary text-primary focus:ring-primary"
+              onChange={handleRagToggle}
+              className="h-4 w-4 rounded border-primary text-primary focus:ring-primary"
+              aria-label="Enable RAG (Retrieval-Augmented Generation)"
             />
             <span>Enable RAG (Context from page)</span>
           </label>
         </div>
       </div>
 
-      <div className="flex gap-2 relative text-sm">
+      {/* Input Area */}
+      <div className="flex items-end gap-2 text-sm">
         <div className="relative flex-1">
           <Textarea
-            value={message}
             ref={inputRef}
+            value={message}
             onChange={(e) => setMessage(e.target.value)}
-            onKeyDown={handleKeyPress}
+            onKeyDown={handleKeyDown}
             placeholder={placeholder}
             disabled={isLoading}
-            className="text-sm pr-12 pl-10 py-2 bg-muted/50 border-transparent focus-visible:bg-background focus-visible:ring-1 focus-visible:ring-primary/20 transition-all shadow-sm min-h-[44px]"
+            className="min-h-11 border-transparent bg-muted/50 pl-10 pr-12 py-2 text-sm shadow-sm transition-all focus-visible:bg-background focus-visible:ring-1 focus-visible:ring-primary/20"
+            aria-label="Message input"
           />
           <Button
             variant="ghost"
             size="icon"
-            onClick={() => setShowOptions(!showOptions)}
-            className={`absolute left-1.5 bottom-1.5 h-8 w-8 rounded-md transition-colors ${showOptions ? 'bg-muted text-primary' : 'text-muted-foreground'}`}
-            title="Chat Options"
+            onClick={toggleOptions}
+            className={`absolute bottom-1.5 left-1.5 h-8 w-8 rounded-md transition-colors ${
+              showOptions ? 'bg-muted text-primary' : 'text-muted-foreground'
+            }`}
+            title="Chat options"
+            aria-label="Toggle chat options"
           >
             <SlidersHorizontal className="h-4 w-4" />
           </Button>
         </div>
-        
+
         <Button
           onClick={handleSend}
           disabled={!message.trim() || isLoading}
           size="icon"
-          className="shrink-0 h-[44px] w-[44px] rounded-md transition-all"
+          className="h-11 w-11 shrink-0 rounded-md transition-all"
+          aria-label={isLoading ? 'Sending message' : 'Send message'}
         >
           {isLoading ? (
             <Loader2 className="h-4 w-4 animate-spin" />
@@ -99,11 +119,11 @@ export const ChatInput: React.FC<ChatInputProps> = ({
           )}
         </Button>
       </div>
-      <div className="mt-2 text-center">
-        <p className="text-[10px] text-muted-foreground/50">
-          AI can make mistakes. Check important info.
-        </p>
-      </div>
+
+      {/* Disclaimer */}
+      <p className="mt-2 text-center text-[10px] text-muted-foreground/50">
+        AI can make mistakes. Check important information.
+      </p>
     </div>
   );
 };
