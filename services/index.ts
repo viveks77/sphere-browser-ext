@@ -3,6 +3,7 @@
  */
 
 export { default as StorageService } from './storage';
+export { SessionService } from './session';
 export {
   AIServiceFactory,
   getAIServiceFactory,

@@ -34,7 +34,6 @@ export class GeminiLLMService extends BaseLLMService {
   constructor(config: LLMServiceConfig) {
     super(config);
     this.initializeClient();
-    this.debug = true;
   }
 
   /**
@@ -138,25 +137,10 @@ export class GeminiLLMService extends BaseLLMService {
       });
       
       let messages: BaseMessage[] = this.convertMessages(request.messages);
-
-      // Build system prompt with RAG context if provided
-      let systemPrompt = '';
-      if (request.ragContext && request.ragContext.documents.length > 0) {
-        const context = this.buildRagContext(request.ragContext.documents);
-        systemPrompt = this.enhanceSystemPromptWithContext(systemPrompt, context);
-      } else if (request.generalContext) {
-        systemPrompt = this.enhanceSystemPromptWithContext(
-          systemPrompt,
-          request.generalContext
-        );
-      }
-
-      // Add browser automation instructions
-      const browserInstructions = `IMPORTANT: When you need to interact with the page (click, type, etc.), YOU MUST FIRST call the 'get_content' tool to inspect the HTML structure. Do not guess CSS selectors. Use the HTML provided by 'get_content' to find unique IDs, classes, or attributes to target elements accurately.`;
-      systemPrompt = `${systemPrompt}\n${browserInstructions}`;
-
-      if (systemPrompt) {
-        messages.unshift(new SystemMessage(systemPrompt));
+      const systemMessage = this.generateSystemMessage(request);
+      
+      if (systemMessage) {
+        messages.unshift(systemMessage);
       }
 
       // Bind tools if available
@@ -237,21 +221,10 @@ export class GeminiLLMService extends BaseLLMService {
       });
 
       let messages: BaseMessage[] = this.convertMessages(request.messages);
+      const systemMessage = this.generateSystemMessage(request);
 
-      // Build system prompt with RAG context if provided
-      let systemPrompt = '';
-      if (request.ragContext && request.ragContext.documents.length > 0) {
-        const context = this.buildRagContext(request.ragContext.documents);
-        systemPrompt = this.enhanceSystemPromptWithContext(systemPrompt, context);
-      } else if (request.generalContext) {
-        systemPrompt = this.enhanceSystemPromptWithContext(
-          systemPrompt,
-          request.generalContext
-        );
-      }
-
-      if (systemPrompt) {
-        messages.unshift(new SystemMessage(systemPrompt));
+      if (systemMessage) {
+        messages.unshift(systemMessage);
       }
 
       // Bind tools if available
@@ -313,20 +286,28 @@ export class GeminiLLMService extends BaseLLMService {
   }
 
   /**
-   * Enhance system prompt with RAG context
+   * Generate system message from request context
    */
-  private enhanceSystemPromptWithContext(basePrompt: string, context: string): string {
-    if (!context) {
-      return basePrompt;
+  private generateSystemMessage(request: ChatRequest): SystemMessage | null {
+    let context = '';
+
+    if (request.ragContext && request.ragContext.documents.length > 0) {
+      context = this.buildRagContext(request.ragContext.documents);
+    } else if (request.generalContext) {
+      context = request.generalContext;
     }
 
-    const contextSection = `You are a helpful assistant. Use the following context to answer questions:\n\n${context}\n\nIf the context doesn't contain the answer, use your general knowledge but mention that the information was not in the provided context. Use tools only if the given context is not relevant.`;
+    let systemPrompt = `You are a helpful assistant.`;
 
-    if (!basePrompt) {
-      return contextSection;
+    if (context) {
+      systemPrompt += `\n\nUse the following context to answer questions:\n\n${context}\n\nIf the context doesn't contain the answer, use your general knowledge but mention that the information was not in the provided context. Use tools only if the given context is not relevant.`;
     }
 
-    return `${basePrompt}\n\n${contextSection}`;
+    // Add browser automation instructions
+    const browserInstructions = `IMPORTANT: When you need to interact with the page (click, type, etc.), YOU MUST FIRST call the 'get_content' tool to inspect the HTML structure. Do not guess CSS selectors. Use the HTML provided by 'get_content' to find unique IDs, classes, or attributes to target elements accurately.`;
+    systemPrompt += `\n\n${browserInstructions}`;
+    
+    return new SystemMessage(systemPrompt);
   }
 
   /**

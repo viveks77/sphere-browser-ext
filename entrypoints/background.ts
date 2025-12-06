@@ -32,7 +32,6 @@ async function initializeChatService(): Promise<boolean> {
     chatService = new ChatService();
     const config = convertToFactoryConfig(storedConfig);
     chatService.initialize(config);
-    console.log('[Background] Chat service initialized successfully');
     return true;
   } catch (error) {
     console.error('[Background] Failed to initialize chat service:', error);
@@ -55,7 +54,6 @@ export default defineBackground(async () => {
 
       const { id } = payload;
       const session = await chatService!.setCurrentTab(id);
-      console.log('[Background] Session loaded for tab:', id);
       return session;
     });
 
@@ -94,7 +92,6 @@ export default defineBackground(async () => {
 
     // Start listening for messages
     await router.startListener();
-    console.log('[Background] Router started and listening for messages');
   } catch (error) {
     console.error('[Background] Router initialization error:', error);
   }

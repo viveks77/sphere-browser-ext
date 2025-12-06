@@ -32,7 +32,7 @@ export class ChatService {
     }
 
     this.currentTabId = tabId;
-    return await this.factory.loadOrCreateTabSession(tabId);
+    return await this.factory.getSessionService().loadOrCreateTabSession(tabId);
   }
 
   /**
@@ -54,14 +54,16 @@ export class ChatService {
   async sendMessage(
     userMessage: string,
     userMessageId: string,
-    enableRag?:boolean,
+    enableRag?: boolean,
     ragContextLimit?: number,
   ): Promise<ChatResponse> {
     if (!this.factory || !this.currentTabId) {
       throw new Error('No active tab');
     }
 
-    const session = await this.factory.getTabSession(this.currentTabId);
+    const sessionService = this.factory.getSessionService();
+    const session = await sessionService.getTabSession(this.currentTabId);
+    
     if (!session) {
       throw new Error('Session not found');
     }
@@ -79,12 +81,12 @@ export class ChatService {
       messages: [...session.messages, userMsg],
     };
 
-    // Prepare context
-    chatRequest = await this.factory.prepareRagRequest(
+    // Prepare context (RAG Logic)
+    chatRequest = await this.prepareRagRequest(
       this.currentTabId,
       chatRequest,
       enableRag,
-      ragContextLimit || 5
+      ragContextLimit
     );
     
     // Get response from LLM (which handles RAG if context is present)
@@ -98,11 +100,78 @@ export class ChatService {
       status: 'sent',
       timestamp: Date.now(),
     };
-    await this.factory.addMessageToTabSession(this.currentTabId, userMsg);
-
-    await this.factory.addMessageToTabSession(this.currentTabId, assistantMsg);
+    
+    await sessionService.addMessageToTabSession(this.currentTabId, userMsg);
+    await sessionService.addMessageToTabSession(this.currentTabId, assistantMsg);
 
     return response;
+  }
+
+  /**
+   * Prepare a chat request with RAG context
+   */
+  private async prepareRagRequest(
+    tabId: string,
+    request: ChatRequest,
+    enableRag: boolean = true,
+    contextLimit: number = 5
+  ): Promise<ChatRequest> {
+    if (!this.factory) return request;
+
+    try {
+      const lastUserMessage = request.messages
+        .toReversed()
+        .find((m) => m.role === 'user');
+
+      if (!lastUserMessage) {
+        return request;
+      }
+
+      const vectorStore = this.factory.getVectorStoreService();
+      const tabDocument = await vectorStore.getTabDocument(tabId);
+
+      if (!enableRag) {
+        if (tabDocument && tabDocument.document) {
+          const { pageContent } = tabDocument.document;
+          return {
+            ...request,
+            generalContext: pageContent,
+          };
+        }
+        return request;
+      }
+
+      // Search vector store
+      const searchResults = await vectorStore.searchInTab(
+        tabId,
+        lastUserMessage.content,
+        contextLimit
+      );
+
+      // If relevant chunks found
+      if (searchResults.length > 0) {
+        return {
+          ...request,
+          ragContext: {
+            documents: searchResults,
+          },
+        };
+      }
+
+      // Fallback: full page
+      if (tabDocument && tabDocument.document) {
+        const { pageContent } = tabDocument.document;
+        return {
+          ...request,
+          generalContext: pageContent,
+        };
+      }
+
+      return request;
+    } catch (error) {
+      console.error('Failed to prepare RAG request', error);
+      return request;
+    }
   }
 
   /**
@@ -113,7 +182,7 @@ export class ChatService {
       throw new Error('No active tab');
     }
 
-    await this.factory.clearTabSession(this.currentTabId);
+    await this.factory.getSessionService().clearTabSession(this.currentTabId);
   }
 
   /**
@@ -129,11 +198,6 @@ export class ChatService {
 
   /**
    * Store webpage content for current tab
-   * 
-   * Chunks the content and indexes for semantic search
-   * 
-   * @param pageContent - Full HTML/text content of the webpage
-   * @param metadata - Optional metadata (URL, title, etc.)
    */
   async storeWebpageContent(
     pageContent: string,
@@ -143,16 +207,15 @@ export class ChatService {
       throw new Error('No active tab');
     }
 
-    await this.factory.addWebpageToTab(this.currentTabId, pageContent, metadata);
+    await this.factory.getVectorStoreService().addWebpageToTab(this.currentTabId, pageContent, metadata);
   }
-
 
   async getTabDocument(): Promise<TabDocuments | null> {
     if (!this.factory || !this.currentTabId) {
       throw new Error('No active tab');
     }
 
-    return await this.factory.getTabDocument(this.currentTabId);
+    return await this.factory.getVectorStoreService().getTabDocument(this.currentTabId);
   }
 
   /**
@@ -163,7 +226,7 @@ export class ChatService {
       throw new Error('No active tab');
     }
 
-    return await this.factory.getTabDocumentCount(this.currentTabId);
+    return await this.factory.getVectorStoreService().getTabDocumentCount(this.currentTabId);
   }
 
   /**
@@ -174,7 +237,7 @@ export class ChatService {
       throw new Error('No active tab');
     }
 
-    await this.factory.clearTabDocuments(this.currentTabId);
+    await this.factory.getVectorStoreService().clearTabDocuments(this.currentTabId);
   }
 }
 

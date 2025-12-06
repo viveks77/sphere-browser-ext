@@ -11,6 +11,7 @@ import {
 } from '@/services/embedding';
 import { VectorStoreService } from '@/services/vectorstore';
 import StorageService from '@/services/storage';
+import { SessionService } from '@/services/session';
 import {
   ChatSession,
   ChatRequest,
@@ -50,11 +51,9 @@ export class AIServiceFactory {
   private embeddingService: BaseEmbeddingService | null = null;
   private vectorStoreService: VectorStoreService | null = null;
   private storageService: StorageService;
+  private sessionService: SessionService | null = null;
   private config: AIServiceFactoryConfig;
   private debug: boolean;
-
-  // Tab-based chat session storage (in-memory cache)
-  private tabSessions: Map<string, ChatSession> = new Map();
 
   constructor(config: AIServiceFactoryConfig) {
     this.config = config;
@@ -87,6 +86,12 @@ export class AIServiceFactory {
         embeddings,
         this.storageService,
         this.config.vectorStore
+      );
+
+      // Initialize Session Service
+      this.sessionService = new SessionService(
+        this.storageService,
+        this.config.llm.config.debug
       );
 
       this.log('AI Service Factory initialized successfully');
@@ -131,164 +136,26 @@ export class AIServiceFactory {
   }
 
   /**
+   * Get Session Service
+   */
+  getSessionService(): SessionService {
+    if (!this.sessionService) {
+      throw new Error(
+        'Session Service not initialized. Call initialize() first.'
+      );
+    }
+    return this.sessionService;
+  }
+
+  /**
    * Send a chat request
    */
   async chat(request: ChatRequest): Promise<ChatResponse> {
     return this.getLLMService().chat(request);
   }
 
-  /**
-   * Load or create a session for a specific tab
-   */
-  async loadOrCreateTabSession(tabId: string): Promise<ChatSession> {
-    // Check if tab session is in memory cache
-    if (this.tabSessions.has(tabId)) {
-      return this.tabSessions.get(tabId)!;
-    }
 
-    // Try to load from storage
-    const storageKey = `tab_session_${tabId}`;
-    const storedSession = await this.storageService.getItem<ChatSession>(
-      storageKey,
-      'session'
-    );
 
-    if (storedSession) {
-      this.tabSessions.set(tabId, storedSession);
-      this.log('Loaded tab session from storage', { tabId });
-      return storedSession;
-    }
-
-    // Create new session for tab
-    const newSession: ChatSession = {
-      id: tabId,
-      title: `Tab ${tabId}`,
-      messages: [],
-      createdAt: Date.now(),
-      updatedAt: Date.now(),
-    };
-
-    this.tabSessions.set(tabId, newSession);
-    await this.storageService.setItem<ChatSession>(storageKey, newSession, 'session');
-    this.log('Created new tab session', { tabId });
-
-    return newSession;
-  }
-
-  /**
-   * Get a tab's session
-   */
-  async getTabSession(tabId: string): Promise<ChatSession | null> {
-    // Check in-memory cache first
-    if (this.tabSessions.has(tabId)) {
-      return this.tabSessions.get(tabId)!;
-    }
-
-    // Load from storage
-    const storageKey = `tab_session_${tabId}`;
-    const session = await this.storageService.getItem<ChatSession>(
-      storageKey,
-      'session'
-    );
-
-    if (session) {
-      this.tabSessions.set(tabId, session);
-    }
-
-    return session || null;
-  }
-
-  /**
-   * Add message to a tab's session
-   */
-  async addMessageToTabSession(tabId: string, message: ChatMessage): Promise<void> {
-    let session: ChatSession | null | undefined = this.tabSessions.get(tabId);
-
-    if (!session) {
-      // Try loading from storage
-      const storedSession = await this.getTabSession(tabId);
-      if (!storedSession) {
-        session = await this.loadOrCreateTabSession(tabId);
-      } else {
-        session = storedSession;
-      }
-    }
-
-    session.messages.push({
-      ...message,
-      id: message.id || `${Date.now()}-${Math.random()}`,
-      timestamp: message.timestamp || Date.now(),
-    });
-
-    session.updatedAt = Date.now();
-    this.tabSessions.set(tabId, session);
-
-    // Persist to storage
-    const storageKey = `tab_session_${tabId}`;
-    await this.storageService.setItem<ChatSession>(storageKey, session, 'session');
-
-    this.log('Added message to tab session', {
-      tabId,
-      messageCount: session.messages.length,
-    });
-  }
-
-  /**
-   * Clear a tab's session
-   */
-  async clearTabSession(tabId: string): Promise<void> {
-    this.tabSessions.delete(tabId);
-    // Clear from storage by setting to null
-    const storageKey = `tab_session_${tabId}`;
-    await this.storageService.setItem(storageKey, null, 'session');
-    this.log('Cleared tab session', { tabId });
-  }
-
-  /**
-   * Add webpage to a tab's vector store
-   */
-  async addWebpageToTab(
-    tabId: string,
-    pageContent: string,
-    metadata?: Record<string, unknown>
-  ): Promise<void> {
-    await this.getVectorStoreService().addWebpageToTab(tabId, pageContent, metadata);
-    this.log('Added webpage to tab vector store', { tabId });
-  }
-
-  /**
-   * Search documents in a tab's vector store
-   */
-  async searchTabDocuments(
-    tabId: string,
-    queryText: string,
-    limit?: number
-  ): Promise<SearchResult[]> {
-    return this.getVectorStoreService().searchInTab(
-      tabId,
-      queryText,
-      limit || 5,
-    );
-  }
-
-  async getTabDocument(tabId: string): Promise<TabDocuments | null> {
-    return this.getVectorStoreService().getTabDocument(tabId);
-  }
-
-  /**
-   * Get document count for a tab
-   */
-  async getTabDocumentCount(tabId: string): Promise<number> {
-    return this.getVectorStoreService().getTabDocumentCount(tabId);
-  }
-
-  /**
-   * Clear a tab's documents from vector store
-   */
-  async clearTabDocuments(tabId: string): Promise<void> {
-    await this.getVectorStoreService().clearTabDocuments(tabId);
-    this.log('Cleared tab documents from vector store', { tabId });
-  }
 
   /**
    * Create LLM service based on provider
@@ -317,88 +184,6 @@ export class AIServiceFactory {
         return new GeminiEmbeddingService(config);
       default:
         throw new Error(`Unsupported Embedding provider: ${provider}`);
-    }
-  }
-
-  /**
-   * Prepare a chat request with RAG context
-   * 
-   * Strategy:
-   * 1. Search vector store for relevant chunks with relevance threshold (0.4 = 40% minimum)
-   * 2. If relevant chunks found → Use as ragContext for targeted retrieval
-   * 3. If no relevant chunks → Use full page as generalContext for comprehensive fallback
-   * 
-   * This approach optimizes context window usage:
-   * - Relevant chunks when query matches page content
-   * - Full page when semantic search returns nothing (edge cases/broad queries)
-   * 
-   * @param tabId - Tab identifier for session isolation
-   * @param request - Chat request with conversation history
-   * @param contextLimit - Maximum number of chunks to retrieve (default: 5)
-   * @returns Enhanced chat request with RAG context attached
-   */
-  async prepareRagRequest(
-    tabId: string,
-    request: ChatRequest,
-    enableRag: boolean = true,
-    contextLimit: number = 5
-  ): Promise<ChatRequest> {
-    try {
-      // Get last user message for search query
-      const lastUserMessage = request.messages
-        .toReversed()
-        .find((m) => m.role === 'user');
-
-      if (!lastUserMessage) {
-        return request;
-      }
-      
-      const tabDocument = await this.getVectorStoreService().getTabDocument(tabId);
-      if(!enableRag){
-        if (tabDocument && tabDocument.document) {
-        const { pageContent } = tabDocument.document;
-        return {
-          ...request,
-          generalContext: pageContent,
-        };
-      }
-      }
-      // Search vector store with relevance threshold (0.4 = 40% similarity minimum)
-      const searchResults = await this.getVectorStoreService().searchInTab(
-        tabId,
-        lastUserMessage.content,
-        contextLimit
-      );
-
-      // If relevant chunks found, use them as RAG context
-      if (searchResults.length > 0) {
-        this.log('Using RAG context from semantic search', {
-          tabId,
-          resultCount: searchResults.length,
-        });
-        return {
-          ...request,
-          ragContext: {
-            documents: searchResults,
-          },
-        };
-      }
-
-      // Fallback: no relevant chunks found, offer full page as context
-      this.log('No relevant chunks found, using full page as fallback', { tabId });
-      if (tabDocument && tabDocument.document) {
-        const { pageContent } = tabDocument.document;
-        return {
-          ...request,
-          generalContext: pageContent,
-        };
-      }
-
-      return request;
-    } catch (error) {
-      this.logError('Failed to prepare RAG request', error);
-      // Return original request if RAG fails
-      return request;
     }
   }
 

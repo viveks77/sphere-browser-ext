@@ -64,7 +64,7 @@ export const useChat = () => {
       }
         
     }catch(e){
-      console.log(e);
+      console.error(e);
       setError('There is an error during initialization');
     }
   }
@@ -141,9 +141,9 @@ export const useChat = () => {
         } else if(response?.error){
           throw new Error(response.error.message);
         }
-      } catch (err: any) {
+      } catch (err: unknown) {
         console.error("Error sending message:", err);
-        const errorMessage = err.message || 'Error sending message';
+        const errorMessage = err instanceof Error ? err.message : 'Error sending message';
         setError(errorMessage);
         setMessages((prev) => 
           prev.map(msg => 

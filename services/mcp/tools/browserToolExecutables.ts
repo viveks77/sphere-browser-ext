@@ -4,12 +4,10 @@ export async function getActiveTabId(): Promise<number> {
     // Fallback: try getting any active tab if lastFocusedWindow fails
     const allActiveTabs = await browser.tabs.query({ active: true });
     if (allActiveTabs.length > 0 && allActiveTabs[0].id) {
-      console.log("Fallback active tab id", allActiveTabs[0].id);
       return allActiveTabs[0].id;
     }
     throw new Error("No active tab found");
   }
-  console.log("active tab id", tabs[0].id);
   return tabs[0].id;
 }
 
@@ -24,7 +22,7 @@ export async function navigate(url: string) {
       reject(new Error("Navigation timed out"));
     }, 30000); // 30s timeout
 
-    const listener = (tid: number, changeInfo: any) => {
+    const listener = (tid: number, changeInfo: { status?: string }) => {
       if (tid === tabId && changeInfo.status === "complete") {
         browser.tabs.onUpdated.removeListener(listener);
         clearTimeout(timeoutId);
