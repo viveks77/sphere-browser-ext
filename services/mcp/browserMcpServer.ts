@@ -4,7 +4,7 @@ import { CallToolRequestSchema, ListToolsRequestSchema, JSONRPCMessage } from "@
 import { Transport } from "@modelcontextprotocol/sdk/shared/transport.js";
 import { InMemoryTransport } from "@/lib/inMemoryTransport";
 import { browserTools } from "./tools/browserToolDefinitions";
-import { navigate, getContent, click, type, executeScript } from './tools/browserToolExecutables';
+import { navigate, getContent, click, type, executeScript, goBack, goForward, validate } from './tools/browserToolExecutables';
 
 export class BrowserMCPServer {
   private server: Server;
@@ -80,6 +80,25 @@ export class BrowserMCPServer {
             const result = await executeScript(script);
             return {
               content: [{ type: "text", text: JSON.stringify(result) }],
+            };
+          }
+          case "go_back": {
+            await goBack();
+            return {
+              content: [{ type: "text", text: "Navigated back" }],
+            };
+          }
+          case "go_forward": {
+            await goForward();
+            return {
+              content: [{ type: "text", text: "Navigated forward" }],
+            };
+          }
+          case "validate": {
+            const { check, expected, selector } = args as { check: string; expected?: string; selector?: string };
+            const result = await validate(check, expected, selector);
+            return {
+              content: [{ type: "text", text: String(result) }],
             };
           }
           default:

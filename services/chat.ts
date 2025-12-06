@@ -46,7 +46,6 @@ export class ChatService {
    * 5. Stores assistant response in session
    * 
    * @param userMessage - User's input text
-   * @param systemPrompt - Optional system instructions
    * @param enableRag - Whether to use RAG context (default: true)
    * @param ragContextLimit - Max chunks to retrieve (default: 5)
    * @param ragThreshold - Relevance threshold for chunks (unused, handled by VectorStore)

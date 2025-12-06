@@ -90,9 +90,7 @@ export async function type(selector: string, text: string) {
     target: { tabId },
     func: (sel: string, t: string) => {
       const el = document.querySelector(sel) as HTMLInputElement;
-      console.log("no element found", el);
       if (el) {
-        console.log("element found", el);
         el.scrollIntoView({ behavior: "smooth", block: "center" });
         el.focus();
 
@@ -108,7 +106,6 @@ export async function type(selector: string, text: string) {
           el.value = t;
         }
 
-        console.log("element typed", el.value);
         el.dispatchEvent(new Event("input", { bubbles: true }));
         el.dispatchEvent(new Event("change", { bubbles: true }));
         el.blur();
@@ -150,4 +147,68 @@ export async function executeScript(script: string) {
     throw new Error(`Script execution failed: ${executionResult.error}`);
 
   return executionResult.result;
+}
+
+export async function goBack() {
+  const tabId = await getActiveTabId();
+  await browser.tabs.goBack(tabId);
+  // Wait a bit for navigation
+  await new Promise(resolve => setTimeout(resolve, 1000));
+}
+
+export async function goForward() {
+  const tabId = await getActiveTabId();
+  await browser.tabs.goForward(tabId);
+  // Wait a bit for navigation
+  await new Promise(resolve => setTimeout(resolve, 1000));
+}
+
+export async function validate(check: string, expected?: string, selector?: string) {
+  const tabId = await getActiveTabId();
+  
+  if (check === 'url') {
+    const tab = await browser.tabs.get(tabId);
+    const currentUrl = tab.url || '';
+    if (expected && !currentUrl.includes(expected)) {
+      throw new Error(`Validation failed: URL '${currentUrl}' does not contain '${expected}'`);
+    }
+    return `URL validation passed: ${currentUrl}`;
+  }
+  
+  if (check === 'title') {
+    const tab = await browser.tabs.get(tabId);
+    const currentTitle = tab.title || '';
+    if (expected && !currentTitle.includes(expected)) {
+      throw new Error(`Validation failed: Title '${currentTitle}' does not contain '${expected}'`);
+    }
+    return `Title validation passed: ${currentTitle}`;
+  }
+  
+  // Element checks require script injection
+  const result = await browser.scripting.executeScript({
+    target: { tabId },
+    func: (c: string, s?: string, e?: string) => {
+      if (!s) throw new Error("Selector required for element validation");
+      const el = document.querySelector(s);
+      
+      if (c === 'element_exists') {
+        if (!el) throw new Error(`Validation failed: Element '${s}' not found`);
+        return `Element '${s}' exists`;
+      }
+      
+      if (c === 'element_text') {
+        if (!el) throw new Error(`Validation failed: Element '${s}' not found`);
+        const text = (el as HTMLElement).innerText || '';
+        if (e && !text.includes(e)) {
+          throw new Error(`Validation failed: Element text '${text}' does not contain '${e}'`);
+        }
+        return `Element text validation passed: '${text}'`;
+      }
+      
+      throw new Error(`Unknown check type: ${c}`);
+    },
+    args: [check, selector, expected],
+  });
+  
+  return result[0].result;
 }

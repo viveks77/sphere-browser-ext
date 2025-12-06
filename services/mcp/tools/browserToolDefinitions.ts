@@ -83,4 +83,43 @@ export const browserTools: BrowserToolDefinition[] = [
       required: ['script'],
     },
   },
+  {
+    name: 'go_back',
+    description: 'Navigate back in the browser history',
+    inputSchema: {
+      type: 'object',
+      properties: {},
+    },
+  },
+  {
+    name: 'go_forward',
+    description: 'Navigate forward in the browser history',
+    inputSchema: {
+      type: 'object',
+      properties: {},
+    },
+  },
+  {
+    name: 'validate',
+    description: 'Validate the state of the page (URL, title, or element existence)',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        check: {
+          type: 'string',
+          enum: ['url', 'title', 'element_exists', 'element_text'],
+          description: 'The type of validation to perform',
+        },
+        expected: {
+          type: 'string',
+          description: 'The expected value (for url, title, or element_text)',
+        },
+        selector: {
+          type: 'string',
+          description: 'CSS selector (required for element_exists and element_text)',
+        },
+      },
+      required: ['check'],
+    },
+  },
 ];
