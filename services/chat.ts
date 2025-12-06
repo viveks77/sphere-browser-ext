@@ -9,6 +9,7 @@ import {
   ChatRequest,
   ChatResponse,
   SearchResult,
+  TabDocuments,
 } from '@/lib/models';
 
 export class ChatService {
@@ -54,7 +55,6 @@ export class ChatService {
   async sendMessage(
     userMessage: string,
     userMessageId: string,
-    systemPrompt?: string,
     enableRag?:boolean,
     ragContextLimit?: number,
   ): Promise<ChatResponse> {
@@ -78,7 +78,6 @@ export class ChatService {
     // Create chat request
     let chatRequest: ChatRequest = {
       messages: [...session.messages, userMsg],
-      systemPrompt,
     };
 
     // Prepare context
@@ -105,69 +104,6 @@ export class ChatService {
     await this.factory.addMessageToTabSession(this.currentTabId, assistantMsg);
 
     return response;
-  }
-
-  /**
-   * Stream a message response with optional RAG context
-   * 
-   * Same flow as sendMessage but yields chunks in real-time
-   * 
-   * @param userMessage - User's input text
-   * @param systemPrompt - Optional system instructions
-   * @param enableRag - Whether to use RAG context (default: true)
-   * @param ragContextLimit - Max chunks to retrieve (default: 5)
-   * @param ragThreshold - Relevance threshold for chunks (unused)
-   * @yields Streamed response chunks
-   */
-  async *streamMessage(
-    userMessage: string,
-    systemPrompt?: string,
-    enableRag?:boolean,
-    ragContextLimit?: number,
-  ): AsyncGenerator<string, void, unknown> {
-    if (!this.factory || !this.currentTabId) {
-      throw new Error('No active tab');
-    }
-
-    const session = await this.factory.getTabSession(this.currentTabId);
-    if (!session) {
-      throw new Error('Session not found');
-    }
-
-    // Add user message to session
-    const userMsg: ChatMessage = {
-      role: 'user',
-      content: userMessage,
-    };
-    await this.factory.addMessageToTabSession(this.currentTabId, userMsg);
-
-    // Create chat request
-    let chatRequest: ChatRequest = {
-      messages: session.messages,
-      systemPrompt,
-    };
-
-    // Prepare context
-    chatRequest = await this.factory.prepareRagRequest(
-      this.currentTabId,
-      chatRequest,
-      enableRag,
-      ragContextLimit || 5
-    );
-
-    // Stream response from LLM (which handles RAG if context is present)
-    let fullResponse = '';
-    for await (const chunk of this.factory.streamChat(chatRequest)) {
-      fullResponse += chunk.content;
-      yield chunk.content;
-    }
-
-    // Add complete assistant message to session
-    const assistantMsg: ChatMessage = {
-      role: 'assistant',
-      content: fullResponse,
-    };
-    await this.factory.addMessageToTabSession(this.currentTabId, assistantMsg);
   }
 
   /**
@@ -209,6 +145,15 @@ export class ChatService {
     }
 
     await this.factory.addWebpageToTab(this.currentTabId, pageContent, metadata);
+  }
+
+
+  async getTabDocument(): Promise<TabDocuments | null> {
+    if (!this.factory || !this.currentTabId) {
+      throw new Error('No active tab');
+    }
+
+    return await this.factory.getTabDocument(this.currentTabId);
   }
 
   /**

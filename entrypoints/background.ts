@@ -74,15 +74,20 @@ export default defineBackground(async () => {
 
         // Load or create session for this tab
         const session = await chatService!.setCurrentTab(id);
-        console.log('session', session);
         // Store webpage content if not already stored
         const tabDocumentCount = await chatService!.getTabDocumentCount();
         if (tabDocumentCount === 0 && content) {
           await chatService!.storeWebpageContent(content, { title, url });
+        }else{
+          const tabDocuments = await chatService!.getTabDocument();
+          if(url !== tabDocuments?.document?.metadata?.url){
+            await chatService!.clearTabDocuments();
+            await chatService!.storeWebpageContent(content, { title, url });
+          }
         }
 
         // Send message and get response
-        const response = await chatService!.sendMessage(query, messageId, undefined, enableRag);
+        const response = await chatService!.sendMessage(query, messageId, enableRag);
         return response;
       }
     );

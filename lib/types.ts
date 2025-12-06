@@ -7,6 +7,14 @@ export type MessageHandler<T, R> = (
 
 export type StorageType = 'local' | 'session';
 
+export type HandlerOptions = {
+
+}
+
+export type ContentRouterHandlerOptions = {
+  stopPropogationToBackground: boolean;
+} & HandlerOptions;
+
 // Message structure with proper typing
 export interface Message<T = unknown> {
   type: MessageType;

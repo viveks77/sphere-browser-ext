@@ -1,6 +1,6 @@
 import { MessageTypes } from "@/lib/constants";
 import { ContentRouter } from "@/lib/router/index";
-import { PageInfo } from "@/lib/types";
+import { ContentRouterHandlerOptions, PageInfo } from "@/lib/types";
 import { generateUniqueId } from "@/lib/utils";
 
 export default defineContentScript({
@@ -26,8 +26,8 @@ export default defineContentScript({
       }
     });
 
-    // Register handler with proper typing
-    contentRouter.registerHandler<{query: string, messageId: string, tabId: string}, PageInfo>(MessageTypes.INITIALIZE_CHAT, (payload) => {
+    // Handler for getting page content
+    contentRouter.registerHandler<{tabId: string}, PageInfo, ContentRouterHandlerOptions>(MessageTypes.GET_PAGE_CONTENT, (payload) => {
       const browserContent = document.body.innerText;
       const url = window.location.href;
       const title = document.title;
@@ -42,9 +42,8 @@ export default defineContentScript({
         content: browserContent,
         url: url,
         title: title,
-        ...payload,
       }
-    });
+    }, { stopPropogationToBackground: true }); 
 
     // Start listening for messages
     contentRouter.startListener().catch((error) => {

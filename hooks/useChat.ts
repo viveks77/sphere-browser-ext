@@ -1,7 +1,7 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { ChatMessage as ChatMessageType, ChatResponse, ChatSession } from '@/lib/models';
 import { MessageTypes } from '@/lib/constants';
-import { Response } from '@/lib/types';
+import { Response, PageInfo } from '@/lib/types';
 import { isConfigured } from '@/lib/configLoader';
 
 export const useChat = () => {
@@ -92,13 +92,32 @@ export const useChat = () => {
           throw new Error('No active tab found');
         }
         
-        const response = await browser.tabs.sendMessage<unknown, Response<ChatResponse>>(currentTab.id, {
+        // Get page content from the tab
+        const pageContentResponse = await browser.tabs.sendMessage<unknown, Response<PageInfo>>(currentTab.id, {
+          type: MessageTypes.GET_PAGE_CONTENT,
+          payload: {
+            tabId: currentTab.id,
+          }
+        });
+        if (pageContentResponse?.error) {
+          throw new Error(pageContentResponse.error.message);
+        }
+
+        const pageInfo = pageContentResponse?.data;
+        if (!pageInfo) {
+          throw new Error('Failed to get page content');
+        }
+
+        // Send chat request directly to background script
+        // This avoids the connection being broken if the page navigates
+        const response = await browser.runtime.sendMessage<unknown, Response<ChatResponse>>({
           type: MessageTypes.INITIALIZE_CHAT,
           payload: {
+            ...pageInfo,
             tabId: currentTab.id,
             query: content,
             messageId: messageId,
-            enableRag: true,
+            enableRag: enableRag,
           }
         });
         
@@ -143,11 +162,6 @@ export const useChat = () => {
     const messageToRetry = messages.find(m => m.id === id);
     if (!messageToRetry || messageToRetry.role !== 'user') return;
 
-    // Remove the failed message and any subsequent messages (though usually there won't be any if it failed)
-    // Actually, better to just update the status of the existing message to 'sending' and try again
-    // But sendMessage adds a new message. So we should probably reuse sendMessage logic but without adding a new message initially?
-    // Or simpler: delete the old failed message and call sendMessage with the content.
-    
     setMessages(prev => prev.filter(m => m.id !== id));
     await sendMessage(messageToRetry.content);
   }, [messages, sendMessage]);

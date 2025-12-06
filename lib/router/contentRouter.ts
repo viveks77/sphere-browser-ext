@@ -1,5 +1,5 @@
 import { BaseRouter } from "./baseRouter";
-import { Message, Response } from "../types";
+import { ContentRouterHandlerOptions, Message, Response } from "../types";
 
 // Content script router - handles messages and forwards to background script
 export class ContentRouter extends BaseRouter {
@@ -21,10 +21,16 @@ export class ContentRouter extends BaseRouter {
         throw new Error(`Handler disappeared for type: "${type}"`);
       }
 
+      const metaData = this.handlerOptions.get(type) as ContentRouterHandlerOptions | undefined;
+
       // Send back to background script
       try {
         const result = await Promise.resolve(handler(payload));
 
+        if(metaData?.stopPropogationToBackground){
+          this.log(`Message handled locally for type: "${type}"`, result);
+          return this.createSuccessResponse(result);
+        }
         const backgroundResponse = await browser.runtime.sendMessage({
           type: type,
           payload: result,

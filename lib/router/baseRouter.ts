@@ -5,11 +5,13 @@ import {
   ErrorResponse,
   MessageHandler,
   RouterOptions,
+  HandlerOptions,
 } from "../types";
 
 // Base router class for handling browser runtime messages with type-safe routing
 export class BaseRouter {
   protected handlers: Map<string, Function> = new Map();
+  protected handlerOptions: Map<string, unknown> = new Map();
   protected options: Required<RouterOptions>;
   private listenerActive = false;
 
@@ -35,9 +37,10 @@ export class BaseRouter {
   }
 
   // Register a message handler for a specific message type
-  registerHandler<T = unknown, R = unknown>(
+  registerHandler<T = unknown, R = unknown, F = unknown>(
     type: string,
-    handler: MessageHandler<T, R>
+    handler: MessageHandler<T, R>,
+    handlerOptions?: F
   ): void {
     if (this.handlers.size >= this.options.maxHandlers) {
       throw new Error(
@@ -56,13 +59,19 @@ export class BaseRouter {
     }
 
     this.handlers.set(type, handler);
+
+    if(handlerOptions){
+      this.handlerOptions.set(type, handlerOptions);
+    }
     this.log(`Handler registered for type: "${type}"`);
   }
 
   // Unregister a message handler
   unregisterHandler(type: string): boolean {
     const result = this.handlers.delete(type);
+  
     if (result) {
+      this.handlerOptions.delete(type);
       this.log(`Handler unregistered for type: "${type}"`);
     }
     return result;

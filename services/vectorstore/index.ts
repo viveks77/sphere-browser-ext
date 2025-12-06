@@ -5,17 +5,9 @@ import { RecursiveCharacterTextSplitter } from '@langchain/textsplitters';
 import StorageService from '@/services/storage';
 import {
   SearchResult,
+  TabDocuments,
   VectorStoreConfig,
 } from '@/lib/models';
-
-interface TabDocuments {
-  tabId: string;
-  document: {
-    pageContent: string;
-    metadata?: Record<string, unknown>;
-  };
-  updatedAt: number;
-}
 
 /**
  * Tab-based vector store using LangChain MemoryVectorStore

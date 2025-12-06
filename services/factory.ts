@@ -20,6 +20,7 @@ import {
   EmbeddingServiceConfig,
   LLMServiceConfig,
   VectorStoreConfig,
+  TabDocuments,
 } from '@/lib/models';
 
 export type LLMProvider = 'gemini';
@@ -134,15 +135,6 @@ export class AIServiceFactory {
    */
   async chat(request: ChatRequest): Promise<ChatResponse> {
     return this.getLLMService().chat(request);
-  }
-
-  /**
-   * Stream chat response
-   */
-  async *streamChat(
-    request: ChatRequest
-  ): AsyncGenerator<ChatResponse, void, unknown> {
-    yield* this.getLLMService().streamChat(request);
   }
 
   /**
@@ -277,6 +269,10 @@ export class AIServiceFactory {
       queryText,
       limit || 5,
     );
+  }
+
+  async getTabDocument(tabId: string): Promise<TabDocuments | null> {
+    return this.getVectorStoreService().getTabDocument(tabId);
   }
 
   /**

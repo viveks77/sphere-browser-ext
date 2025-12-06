@@ -21,7 +21,6 @@ export interface ChatRequest {
   model?: string;
   temperature?: number;
   maxTokens?: number;
-  systemPrompt?: string;
   metadata?: Record<string, unknown>;
   ragContext?: {
     documents: SearchResult[];
@@ -105,4 +104,13 @@ export interface EmbeddingServiceConfig extends ServiceConfig {
 export interface VectorStoreConfig {
   storageKey?: string;
   debug?: boolean;
+}
+
+export interface TabDocuments {
+  tabId: string;
+  document: {
+    pageContent: string;
+    metadata?: Record<string, unknown>;
+  };
+  updatedAt: number;
 }

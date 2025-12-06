@@ -6,7 +6,7 @@ const PATH_ALIAS = path.resolve(__dirname, '');
 
 export default defineConfig({
   manifest: {
-    permissions: ['storage'],
+    permissions: ['storage', 'scripting', 'activeTab', 'tabs'],
   },
   vite: () => ({
     plugins: [tailwindcss()],
