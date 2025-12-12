@@ -5,6 +5,7 @@
 
 ---
 
+
 ## What Can Sphere Do?
 
 - **Chat with Webpages:** Ask questions about the current page, get summaries, or request explanations.
@@ -12,6 +13,23 @@
 - **Seamless Side Panel:** Chat appears in a convenient side panel, so you never lose context.
 - **Works Everywhere:** Supports Chrome, Firefox, and other Chromium-based browsers.
 - **Bring Your Own API Key:** Easily connect your own LLM API keys for privacy and flexibility.
+
+---
+
+## Actions Sphere Can Perform
+
+Sphere can automate and interact with your browser using the following actions:
+
+- **Navigate:** Go to any URL in the active tab.
+- **Get Content:** Extract all text content from the current page.
+- **Click:** Click any element on the page using a CSS selector.
+- **Type:** Enter text into input fields or forms.
+- **Execute Script:** Run custom JavaScript on the page.
+- **Go Back:** Navigate back in browser history.
+- **Go Forward:** Navigate forward in browser history.
+- **Validate:** Check the page URL, title, or whether specific elements exist or contain certain text.
+
+These actions can be combined and controlled through the chat interface, making it easy to automate browsing, extract information, or test web pages—all with natural language commands.
 
 ---
 
