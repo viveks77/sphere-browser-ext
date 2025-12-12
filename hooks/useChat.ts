@@ -171,6 +171,24 @@ export const useChat = () => {
     setError(undefined);
   }, []);
 
+  const clearSession = useCallback(async () => {
+    setIsLoading(true);
+    try{
+      const response =await browser.runtime.sendMessage<unknown, Response>({type: MessageTypes.CLEAR_SESSION});
+      if(response?.success){
+        setMessages([]);
+        setError("");
+        setIsInitialized(true);
+        setIsLoading(false);
+      }
+    }catch(err){
+      setError("Error clearing session.");
+    }
+
+    setMessages([]);
+    setError(undefined);
+  }, [])
+
   return {
     messages,
     isLoading,
@@ -181,5 +199,6 @@ export const useChat = () => {
     retryMessage,
     clearMessages,
     setEnableRag,
+    clearSession
   };
 };

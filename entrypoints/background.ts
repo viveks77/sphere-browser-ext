@@ -90,6 +90,16 @@ export default defineBackground(async () => {
       }
     );
 
+    router.registerHandler(MessageTypes.CLEAR_SESSION, async (payload: PageInfo) => {
+      if(!chatService){
+        const initialized = await initializeChatService();
+        if(!initialized){
+          throw new Error("Chat service not initialized. Please configure the extension");
+        }
+      }
+      await chatService?.clearTabSession();
+    })
+
     // Start listening for messages
     await router.startListener();
   } catch (error) {

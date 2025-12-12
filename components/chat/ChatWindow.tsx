@@ -3,7 +3,8 @@ import { ChatMessage as ChatMessageType } from '@/lib/models';
 import { ChatMessage } from './ChatMessage';
 import { ChatInput } from './ChatInput';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Bot, MessageSquare, Sparkles } from 'lucide-react';
+import { Bot, MessageSquare, Sparkles, Trash } from 'lucide-react';
+import { Button } from '../ui/button';
 
 interface ChatWindowProps {
   messages: ChatMessageType[];
@@ -14,6 +15,7 @@ interface ChatWindowProps {
   onRetry?: (id: string) => void | Promise<void>;
   enableRag?: boolean;
   setEnableRag?: (enable: boolean) => void;
+  clearSession: () => Promise<void>
 }
 
 export const ChatWindow: React.FC<ChatWindowProps> = ({
@@ -25,6 +27,7 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
   onRetry,
   enableRag,
   setEnableRag,
+  clearSession
 }) => {
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -41,13 +44,19 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
     <div className="flex h-full flex-col min-w-[450px] bg-background font-sans">
       {/* Header */}
       <div className="sticky top-0 z-10 border-b border-border/40 bg-background/95 px-4 py-4 backdrop-blur supports-backdrop-filter:bg-background/60">
-        <div className="flex items-center gap-2.5">
-          <div className="bg-primary/10 p-2 rounded-lg">
-            <Bot className="w-5 h-5 text-primary" />
+        <div className="flex justify-between items-center gap-2.5">
+          <div className='flex items-center gap-2.5'>
+            <div className="bg-primary/10 p-2 rounded-lg">
+              <Bot className="w-5 h-5 text-primary" />
+            </div>
+            <div>
+              <h2 className="text-sm font-semibold leading-none tracking-tight">Sphere</h2>
+              <p className="text-xs text-muted-foreground mt-1">Ask questions about this page</p>
+            </div>
           </div>
-          <div>
-            <h2 className="text-sm font-semibold leading-none tracking-tight">Page Assistant</h2>
-            <p className="text-xs text-muted-foreground mt-1">Ask questions about this page</p>
+          
+          <div className="">
+            {messages.length > 0 && <Button onClick={clearSession} variant={'outline'}><Trash/></Button>}
           </div>
         </div>
       </div> 
