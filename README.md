@@ -3,10 +3,14 @@
 
 > **Sphere** is a browser extension that lets you chat with any webpage using powerful AI models (Gemini, OpenAI, and more). Get instant answers, summaries, and automate browser actions—all from a friendly chat interface.
 
+<p align="center">
+   <img src="./screenshot/screenshot.png" alt="Sphere browser extension screenshot" width="700" />
+</p>
+
 ---
 
 
-## What Can Sphere Do?
+## Features
 
 - **Chat with Webpages:** Ask questions about the current page, get summaries, or request explanations.
 - **Automate Tasks:** Use AI to click buttons, fill forms, extract data, and even run scripts on the page.
@@ -16,7 +20,7 @@
 
 ---
 
-## Actions Sphere Can Perform
+## MCP Features
 
 Sphere can automate and interact with your browser using the following actions:
 
